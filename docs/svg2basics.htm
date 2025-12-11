@@ -1,0 +1,246 @@
+<section class="Post NoPrintIcon" data-icon="html5">   
+<h2 class="Collapse">Creating an <code>SVG2</code> Drawing</h2><div class="Collapse">
+
+<p>Download the <a href="https://dmaccarthy.github.io/svg2/dist/svg2-0.1.0-alpha-min.js">SVG2 distribution</a> into your source folder and included it and <code>jquery</code> in your HTML5 document.</p>
+<pre class="Code" data-echo="html">&lt;script type="text/javascript" src="https://code.jquery.com/jquery-3.7.1.min.js"&gt;&lt;/script&gt;
+&lt;script type="text/javascript" src="svg2-0.1.0-alpha-min.js"&gt;&lt;/script&gt;</pre>
+
+<p>Create an <code>&lt;svg&gt;</code> tag somewhere in the body of your document:</p>
+<pre class="Code" data-echo="html">&lt;p&gt;&lt;svg id="Drawing1"&gt;&lt;/svg&gt;&lt;/p&gt;</pre>
+
+<p>In your Javascript, create an instance of the <code>SVG2</code> class and associate it with the <code>&lt;svg&gt;</code> tag using a selector for its <code>id</code> attribute:</p>
+<pre class="Code" data-echo="js">function draw() {
+    let svg = new SVG2("#Drawing1", {
+        lrbt: [-5, 5, -5, 5],
+        scale: 32,
+        margin: 2,
+        grid: 1
+    });
+
+    <span class="Comment">// Add drawing instructions here later</span>
+
+}
+
+$(draw); <span class="Comment">// Run the function when document is loaded</span></pre>
+
+<p>The first argument to the <code>SVG2</code> constructor is the selector that identifies the <code>&lt;svg&gt;</code> element you want to use.</p>
+<p>The second argument is an object describing the <code>SVG2</code> instance’s configuration.</p>
+
+<p>Alternatively, if you do not want to use an existing <code>&lt;svg&gt;</code> tag for your drawing, you can call the static function <code>SVG2.create</code> instead of the constructor, to create a new element and then add it to your document:</p>
+<pre class="Code" data-echo="js">let svg = SVG2.create({
+    lrbt: [-5, 5, -5, 5],
+    scale: 32,
+    margin: 2,
+    grid: 1
+});
+
+$("body").append(svg.element);</pre>
+
+<p>The items in the configuration object in these examples are as follows:</p>
+<ul>
+    <li><b>lrbt</b>: This stands for “left, right, bottom, top”. It is a 4-array specifying the coordinate system your drawing will use. The first two values assign coordinates to the left and right edges of the drawing and the last two to the bottom and top.</li>
+    <li><b>scale</b>: An integer that specifies the drawing scale. In this example, <code>32</code> means that one unit in the coordinate system equals 32 pixels on the screen. You can also pass a 2-array if you want to use different scales in the <span class="TeX">x</span> and <span class="TeX">y</span> dimensions. You can omit the <code>scale</code> option and provided a <code>size</code> option instead. The scale will be calculated so that the drawing size, including margins, will equal the specified size.</li>
+    <li><b>margin</b>: The number of pixels to add outside of the coordinates specified by <code>lrbt</code>. This can be a 4-array to specify different margins along the left, right, bottom, and top edges.</li>
+    <li><b>grid</b>: This option causes a coordinate grid to be drawn at the specified interval. This can be a 2-array to have different grid intervals in the <span class="TeX">x</span> and <span class="TeX">y</span> dimensions.</li>
+    <!-- <li><b></b>: </li> -->
+</ul>
+<p>Additional options not shown in the example above include:</p>
+<ul>
+    <li><b>noAxes</b>: By default, the <span class="TeX">x</span> and <span class="TeX">y</span> axes are styled differently than other gridlines. Set this option to <code>true</code> to disable this default.</li>
+    <li><b>appendAxes</b>: By default, the lines representing the axes are rendered last, so that the axes appear on top of the gridlines. Set this to <code>false</code> to disable this default.</li>
+</ul>
+
+<p>Running the example above will produce the following drawing:</p>
+<p class="Center"><svg id="Drawing1"></svg></p>
+</div></section>
+
+<section class="Post NoPrintIcon" data-icon="html5">   
+<h2 class="Collapse">Adding Shapes</h2><div class="Collapse">
+
+<p>After creating your <code>SVG2</code> instance as in the previous section, you can draw basic shapes by adding instructions like the following to your <code>draw</code> function:</p>
+
+<pre class="Code" data-echo="js">svg.line([3, 1], [-4, 2]);
+svg.circle(2, [3, 1]);
+svg.ellipse([1, "25"], [-4, 2]);
+svg.rect([2, "20"], [-3, -2]);
+svg.poly([[0, 0], [-2, 4], [1, 3]]);</pre>
+
+<p>The drawing will now look like this:</p>
+<p class="Center"><svg id="Drawing2"></svg></p>
+
+<p>The <code>line</code> method draws a line between the two points provided. However, the line will not be visible on the drawing yet because we have not specified the <code>stroke</code> colour.</p>
+<p>The <code>circle</code> method draws a circle. The first argument (<code>2</code>) is the radius of the circle and the second argument (<code>[3, 1]</code>) gives the coordinates of the circle’s centre. See the <em>Anchoring</em> section below to see how to position circles and other shapes using an anchor point other than the shape’s centre.</span></p>
+<p>If the drawing uses a different scale for the <span class="TeX">x</span> and <span class="TeX">y</span> axes, the size of the circle will be based on an average of the scales. <!--For example, a scale of 32 would mean that a radius of 2 units equals 64 pixels. If the other axis has a scale of 20, 2 units would be 40 pixels. <code>SVG2</code> calculates a “root mean square average” of 64 and 40, and draws the circle with a radius of about 53 pixels.--></p>
+<p>By default, a new <code>&lt;circle&gt;</code> element is appended to the <code>&lt;svg&gt;</code> element, however you can pass as a third argument an existing circle to be resized or recentred. This argument can be an <code>SVGCircleElement</code> instance, or a <code>jquery</code> collection or selector string representing the element.</p>
+<p>The <code>circle</code> method returns a <code>jquery</code> collection containing the <code>&lt;circle&gt;</code> element.</p>
+<p>The <code>ellipse</code> method is similar to the circle method except that the radius argument is replaced by a 2-array specifying different horizontal and vertical radii.</p>
+
+<p>The <code>rect</code> method draws a rectangle. The first argument gives the dimensions of the rectangle and the second the coordinates of its centre. Note that the dimensions in the example are given as <code>[2, "20"]</code>. The unquoted value <code>2</code> indicates a width of 2 units in the drawing’s coordinate system. The quoted <code>"20"</code> indicates a height of 20 <em>pixels</em>. <code>SVG2</code> interprets actual numbers as coordinate system values and numbers-as-strings as pixel values.</p>
+
+<p>The <code>poly</code> method draws either a closed <code>&lt;polygon&gt;</code> or open <code>&lt;polyline&gt;</code>. The first argument is an array of points to connect. The optional second argument is a boolean value specifying whether to draw a closed (<code>true</code>) or open (<code>false</code>, default) shape. Alternatively, the second argument can describe an existing <code>&lt;polygon&gt;</code> or <code>&lt;polyline&gt;</code> element to be modified.</p>
+</div></section>
+
+<section class="Post NoPrintIcon" data-icon="html5">   
+<h2 class="Collapse">Styling the Shapes</h2><div class="Collapse">
+
+<p>Since the <code>line</code>, <code>circle</code>, <code>ellipse</code>, <code>rect</code>, and <code>poly</code> methods all return <code>jquery</code> collections, you can use the <code>jquery.css</code> method to set the <code>fill</code>, <code>stroke</code> and <code>stroke-width</code> style attributes.</p>
+
+<pre class="Code" data-echo="js">svg.line([3, 1], [-4, 2]).css({"stroke": "black", "stroke-width": "2px"});
+svg.circle(2, [3, 1]).css({"fill": "red", "stroke": "black", "stroke-width": "2px"});
+svg.ellipse([1, "25"], [-4, 2]).css({"fill": "#0065fe", "stroke": "none"});
+svg.rect([2, "20"], [-3, -2]).css({"fill": "none", "stroke": "red", "stroke-width": "4px"});
+svg.poly([[0, 0], [-2, 4], [1, 3]]).css({"fill": "none", "stroke": "limegreen", "stroke-width": "1px"});</pre>
+
+<p>The drawing will now look like this:</p>
+<p class="Center"><svg id="Drawing3"></svg></p>
+
+<p><code>SVG2</code> provides a static function <code>style</code> that makes styling more concise. The following code produces the exact same result:</p>
+<pre class="Code" data-echo="js">SVG2.style(svg.line([3, 1], [-4, 2]), "black@2");
+SVG2.style(svg.circle(2, [3, 1]), "red", "black@2");
+SVG2.style(svg.ellipse([1, "25"], [-4, 2]), "#0065fe", "none@");
+SVG2.style(svg.rect([2, "20"], [-3, -2]), "none", "red@4");
+SVG2.style(svg.poly([[0, 0], [-2, 4], [1, 3]]), "none", "limegreen@1");</pre>
+
+<p>The first argument is the <code>jquery</code> collection to be styled. The remaining arguments are style descriptors. The function interprets a string containing the <code>@</code> symbol as a <code>stroke</code> and <code>stroke-width</code> value; <code>"red@4"</code> is short for <code>{"stroke": "red", "stroke-width": "4px"}</code>. If the string begins or ends with <code>@</code>, it will set only the <code>stroke</code> (e.g. <code>none@</code>) or only the <code>stroke-width</code> (e.g. <code>@2</code>)</p>
+<p>Strings that do not contain the <code>@</code> symbol are taken as <code>fill</code> values.</p>
+<p>The <code>SVG2.style</code> function returns the <code>jquery</code> collection that was passed as the first argument.</p>
+
+</div></section>
+
+<section class="Post NoPrintIcon" data-icon="html5">   
+<h2 class="Collapse">Anchoring</h2><div class="Collapse">
+<p>Many elements — including circles, rectangles, and images — are positioned by their centres by default. As the example below shows, you can change the anchor point of the shape by adding additional information to the position argument.</p>
+<pre class="Code" data-echo="js">SVG2.style(svg.rect([4, 2], [0, 0]), "red@3", "none");
+SVG2.style(svg.rect([4, 2], [[0, 0], <span class="Blue">[1, 0.25]</span>]), "limegreen@3", "none");
+SVG2.style(svg.rect([4, 2], [0, 0, <span class="Blue">0, 0</span>]), "#0065fe@3", "none");
+</pre>
+<p class="Center"><svg id="Drawing6"></svg></p>
+<p>All three of these rectangles have sizes of <code>[4, 2]</code> and positions of <code>[0, 0]</code>. The red rectangle is drawn with its centre at <code>[0, 0]</code> as is the default.</p>
+<p>The other two rectangles have additional anchoring information as highlighted in blue.</p>
+<p>For the green rectangle, the position argument is an array of two ordered pairs: <code>[[0, 0], [1, 0.25]]</code>. The first ordered pair is the position, <code>[0, 0]</code>, and the second describes the anchor point, <code>[1, 0.25]</code>.</p>
+<p class="Center"><svg id="Drawing7"></svg></p>
+<p>The anchor point is described relative to the width and height of the rectangle, starting from the top left. An anchor of <code>[1, 0.25]</code> means a point on the right side of the rectangle, one-quarter of the way down. <code>SVG2</code> will draw the rectangle so that this point is at the specified position.</p>
+<p>For the blue rectangle, the position argument is given as a single 4-array, <code>[0, 0, 0, 0]</code>, rather than as two ordered pairs. <code>SVG2</code> will take the first two values as the position and the next two as the anchor. Thus the blue rectangle is drawn so that its top left corner is at the origin.</p>
+<p class="Center"><svg id="Drawing8"></svg></p>
+</div></section>
+
+<section class="Post NoPrintIcon" data-icon="html5">   
+<h2 class="Collapse">Grouping &amp; Transforming</h2><div class="Collapse">
+
+<p>The SVG <code>&lt;g&gt;</code> element is used to group items. You can apply styles to a group, which are then inherited by the contents of the group rather than having to style each item individually. You can also use groups to translate, rotate, and animate parts of the drawing.</p>
+
+<pre class="Code" data-echo="js">let blue = svg.group("black@2", "#0065fe", {"fill-opacity": 0.5});
+blue.line([3, 1], [-4, 2]);
+blue.circle(2, [3, 1]);
+blue.ellipse([1, "25"], [-4, 2]);
+blue.rect([2, "20"], [-3, -2]);
+SVG2.style(svg.poly([[0, 0], [-2, 4], [1, 3]]), "none", "red@2");</pre>
+
+<p class="Center"><svg id="Drawing4"></svg></p>
+<p>In this example, we create a group <code>blue</code> by calling the <code>svg.group</code> method, which appends a new <code>&lt;g&gt;</code> element to the <code>&lt;svg&gt;</code>. The argument list contains the style information to be applied to the group. We then create our shapes by running the <code>circle</code>, <code>rect</code> and other methods on the group identified by <code>blue</code> rather than on <code>svg</code>, to append new elements to the <code>&lt;g&gt;</code> element.</p>
+<p>Note that the <code>poly</code> method in the final line was called on <code>svg</code> rather than <code>blue</code>, so the <code>polyline</code> will not be part of the group, will not inherit its styles, and will not move or rotate with the group.</p>
+
+<p>Groups have a <code>config</code> method that we can use to shift and rotate the group. Adding the following line of code will rotate the entire group by 45° counterclockwise using the coordinates <code>[3, 1]</code> as the pivot point (the centre of the circle), and then translate the entire group one unit to the left, and one unit up. Theta (<i>θ</i>) is the Greek letter often used to represent angles in mathematics.</p>
+<pre class="Code" data-echo="js">blue.config({theta: 45, pivot: [3, 1], shift: [-1, 1]});</pre>
+<p class="Center"><svg id="Drawing5"></svg></p>
+
+<p>If we later change the <code>pivot</code> property, the coordinates we provide are relative to the original, unshifted and unrotated state.</p>
+</div></section>
+
+<script type="text/javascript" data-init="draw">
+
+loadFeed.draw = () => {
+    for (let i=1;i<9;i++) loadFeed[`draw${i}`]();
+}
+
+loadFeed.draw8 = () => {
+    let svg = new SVG2("#Drawing8", {lrbt: [-4, 4, -1.5, 2], scale: 32, margin: 2, grid: 0});
+    let g = svg.group("black@1");
+    g.line([-2, -1], [-2, 1.3]);
+    g.line([0, -1], [0, 1.3]);
+    g.line([2, -1], [2, 1.3]);
+    g.line([-2.3, 1], [2, 1]);
+    g.line([-2.3, 0], [2, 0]);
+    g.line([-2.3, -1], [2, -1]);
+    css(svg.rect([4, 2]), "white", "#0065fe@3");
+    g = svg.group("text");
+    g.gtext("0", [], [-2, 1.75]);
+    g.gtext("0.5", [], [0, 1.75]);
+    g.gtext("1", [], [2, 1.75]);
+    g.gtext("0", [], [-2.75, 1]);
+    g.gtext("0.5", [], [-2.75, 0]);
+    g.gtext("1", [], [-2.75, -1]);
+    css(svg.circle("5", [-2, 1]), "#0065fe", "black@1");
+}
+
+loadFeed.draw7 = () => {
+    let svg = new SVG2("#Drawing7", {lrbt: [-4, 4, -1.5, 2], scale: 32, margin: 2, grid: 0});
+    let g = svg.group("black@1");
+    g.line([-2, -1], [-2, 1.3]);
+    g.line([0, -1], [0, 1.3]);
+    g.line([2, -1], [2, 1.3]);
+    g.line([-2.3, 1], [2, 1]);
+    g.line([-2.3, 0], [2, 0]);
+    g.line([-2.3, -1], [2, -1]);
+    css(svg.rect([4, 2]), "white", "limegreen@3");
+    g = svg.group("text");
+    g.gtext("0", [], [-2, 1.75]);
+    g.gtext("0.5", [], [0, 1.75]);
+    g.gtext("1", [], [2, 1.75]);
+    g.gtext("0", [], [-2.75, 1]);
+    g.gtext("0.5", [], [-2.75, 0]);
+    g.gtext("1", [], [-2.75, -1]);
+    css(svg.circle("5", [2, 0.5]), "limegreen", "black@1");
+}
+
+loadFeed.draw6 = () => {
+    let svg = new SVG2("#Drawing6", {lrbt: [-5, 5, -3, 2], scale: 32, margin: 2, grid: 1});
+    css(svg.rect([4, 2], [0, 0]), "red@3", "none");
+    css(svg.rect([4, 2], [[0, 0], [1, 0.25]]), "limegreen@3", "none");
+    css(svg.rect([4, 2], [0, 0, 0, 0]), "#0065fe@3", "none");
+}
+
+loadFeed.draw1 = () => {
+    let svg = new SVG2("#Drawing1", {lrbt: [-5, 5, -5, 5], scale: 32, margin: 2, grid: 1});
+}
+
+loadFeed.draw2 = () => {
+    let svg = new SVG2("#Drawing2", {lrbt: [-5, 5, -5, 5], scale: 32, margin: 2, grid: 1});
+    svg.line([3, 1], [-4, 2]);
+    svg.circle(2, [3, 1]);
+    svg.ellipse([1, "25"], [-4, 2]);
+    svg.rect([2, "20"], [-3, -2]);
+    svg.poly([[0, 0], [-2, "8"], [1, 3]]);
+}
+
+loadFeed.draw3 = () => {
+    let svg = new SVG2("#Drawing3", {lrbt: [-5, 5, -5, 5], scale: 32, margin: 2, grid: 1});
+    css(svg.line([3, 1], [-4, 2]), "black@2");
+    css(svg.circle(2, [3, 1]), "red", "black@2");
+    css(svg.ellipse([1, "25"], [-4, 2]), "#0065fe", "none@");
+    css(svg.rect([2, "20"], [-3, -2]), "none", "red@4");
+    css(svg.poly([[0, 0], [-2, 4], [1, 3]]), "none", "limegreen@1");
+}
+
+loadFeed.draw4 = (n) => {
+    let svg = new SVG2(`#Drawing${n ? n : 4}`, {lrbt: [-5, 5, -5, 5], scale: 32, margin: 2, grid: 1});
+    let blue = svg.group("black@2", "#0065fe", {"fill-opacity": 0.5});
+    blue.line([3, 1], [-4, 2]);
+    blue.circle(2, [3, 1]);
+    blue.ellipse([1, "25"], [-4, 2]);
+    blue.rect([2, "20"], [-3, -2]);
+    css(svg.poly([[0, 0], [-2, 4], [1, 3]]), "none", "red@2");
+    return blue;
+}
+
+loadFeed.draw5 = () => {
+    let blue = loadFeed.draw4(5);
+    blue.config({theta: 45, pivot: [3, 1], shift: [-1, 1]});
+}
+
+loadFeed.data = {
+    title: `SVG2 Tutorial 1: Basics`,
+    up: "home", next: "svg2img"
+}
+
+</script>

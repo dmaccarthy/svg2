@@ -1,0 +1,8 @@
+<svg viewBox="-4 -4 108 108" xmlns="http://www.w3.org/2000/svg">
+<style>
+
+* {fill: none; stroke: #0065fe; stroke-width: 6; stroke-linejoin: round}
+
+</style>
+<polygon transform="rotate(180 50 50)" points="100 50 47 87 35 71 51 60 0 60 0 40 51 40 35 29 47 13"></polygon>
+</svg>

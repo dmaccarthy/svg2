@@ -1,0 +1,16 @@
+let data_images = {
+
+// Convert common SVG images to data URLs to reduce network usage!
+
+chevron_d: `<svg width="100" height="100" viewBox="-5 5 144 144" xmlns="http://www.w3.org/2000/svg"><style>polygon {fill: #0065fe; stroke: #0065fe; stroke-width: 3; stroke-linejoin: round}</style><polygon points="98.1 50.0 50.0 1.9 35.6 16.3 69.2 50.0 35.6 83.7 50.0 98.1" transform="rotate(90 50 50)"></polygon></svg>`,
+chevron_r: `<svg width="100" height="100" viewBox="25 -15 144 144" xmlns="http://www.w3.org/2000/svg"><style>polygon {fill: #0065fe; stroke: #0065fe; stroke-width: 3; stroke-linejoin: round}</style><polygon points="98.1 50.0 50.0 1.9 35.6 16.3 69.2 50.0 35.6 83.7 50.0 98.1"></polygon></svg>`,
+copy: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><style>* {stroke: #0065fe; stroke-width: 3; stroke-linejoin: round} polyline {fill: white} .Corner, rect {fill: #0065fe; fill-opacity: 0.2}</style><rect x="2" y="2" width="60" height="80"></rect><polyline points="77,98 37,98 37,18 97,18 97,78 77,98 77,78"></polyline><line x1="42" y1="50" x2="90" y2="50"></line><line x1="42" y1="35" x2="90" y2="35"></line><line x1="42" y1="65" x2="90" y2="65"></line><line x1="42" y1="80" x2="77" y2="80"></line><polyline class="Corner" points="77,98 77,78 97,78 77,98"></polyline></svg>`,
+download: `<svg viewBox="-4 -4 108 108" xmlns="http://www.w3.org/2000/svg"><style>* {fill: none; stroke: #0065fe; stroke-width: 6; stroke-linejoin: round;}</style><line x1="50" y1="0" x2="50" y2="75"></line><polyline points="20,50 50,75 80,50"></polyline><polyline points="0,80 0,100 100,100 100,80"></polyline></svg>`,
+html5: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="#E34F26" d="M71,460 L30,0 481,0 440,460 255,512"/><path fill="#EF652A" d="M256,472 L405,431 440,37 256,37"/><path fill="#EBEBEB" d="M256,208 L181,208 176,150 256,150 256,94 255,94 114,94 115,109 129,265 256,265zM256,355 L255,355 192,338 188,293 158,293 132,293 139,382 255,414 256,414z"/><path fill="#FFF" d="M255,208 L255,265 325,265 318,338 255,355 255,414 371,382 372,372 385,223 387,208 371,208zM255,94 L255,129 255,150 255,150 392,150 392,150 392,150 393,138 396,109 397,94z"/></svg>`,
+open_tab: `<svg viewBox="-4 -4 108 108" xmlns="http://www.w3.org/2000/svg"><style>* {fill: none; stroke: #0065fe; stroke-width: 6; stroke-linejoin: round}</style><polyline points="40,8 0,8 0,100 92,100 92,60"></polyline><polyline points="60,0 100,0 100,40"></polyline><line x1="100" y1="0" x2="50" y2="50"></line></svg>`,
+print: `<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg"><style>* {fill: white; stroke: #0065fe; stroke-width: 5; stroke-linejoin: round}</style><polygon points="19.2 64 19.2 3.2 108.8 3.2 108.8 64"></polygon><polygon points="3.2 92.8 3.2 41.6 124.8 41.6 124.8 92.8"></polygon><polygon points="19.2 124.8 19.2 80 108.8 80 108.8 124.8"></polygon><line x1="9.6" y1="80" x2="118.4" y2="80"></line><line x1="12.8" y1="54.4" x2="28.8" y2="54.4"></line><line x1="28.8" y1="96" x2="99.2" y2="96"></line><line x1="28.8" y1="110.7" x2="99.2" y2="110.7"></line></svg>`,
+
+};
+
+for (let i in data_images)
+    data_images[i] = `data:image/svg+xml;base64,` + unicode_to_base64(data_images[i]);

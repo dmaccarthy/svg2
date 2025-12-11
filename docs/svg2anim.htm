@@ -1,0 +1,106 @@
+<section class="Post NoPrintIcon" data-icon="html5">   
+<h2 class="Collapse">Animations</h2><div class="Collapse">
+
+<p>Here’s a simple animation of Earth and Venus orbiting the Sun. Below that is the function that creates the animation using <code>SVG2</code>. We will go through the function line by line to see how it works.</p>
+<p class="Center"><svg id="Orbits"></svg></p>
+
+<pre class="Code" data-echo="js">function draw() {
+    <span class="Comment">// Create the animation</span>
+    let svg = new SVG2("#Orbits", {lrbt: [-1.1, 1.1, -1.1, 1.1], scale: 160});
+
+    <span class="Comment">// Draw the Sun at the origin</span>
+    SVG2.style(svg.circle("12"), "yellow");
+
+    <span class="Comment">// Define a function to make random angles</span>
+    let angle = () => 360 * Math.random();
+
+    <span class="Comment">// Draw and animate Earth</span>
+    let earth = svg.group("#0065fe");
+    earth.circle("7", [1, 0]);
+    earth.config({animated: true, theta: angle(), omega: 20});
+
+    <span class="Comment">// Draw and animate Venus</span>
+    let venus = svg.group("lightgrey");
+    venus.circle("6", [0.72, 0]);
+    venus.config({animated: true, theta: angle(), omega: 32});
+
+    <span class="Comment">// Set background to black and pause/resume on mouse click</span>
+    svg.$.css("background-color", "black").on("click", () => svg.toggle());
+
+    <span class="Comment">// Start the animation</span>
+    svg.play();
+}</pre>
+
+<p>The first line creates the animation to run in an <code>&lt;svg&gt;</code> identified by <code>id = "Orbits"</code>:</p>
+<pre class="CodeScroll">let svg = new SVG2("#Orbits", {lrbt: [-1.1, 1.1, -1.1, 1.1], scale: 160})</pre>
+<p>We want the Earth to orbit at a radius of 1, so we’ve defined the coordinate system to go a little past 1 on both the positive and negative sides of both axes. The <code>scale</code> sets the overall size of the animation.</p>
+<p>Next we draw a yellow circle with a radius of 12 pixels to represent the Sun. We do not need to specify the coordinates of the centre since the default position will be the origin.</p>
+<pre class="CodeScroll">SVG2.style(svg.circle("12"), "yellow")</pre>
+<p>Now we define a function that chooses a random angle between 0 and 360:</p>
+<pre class="CodeScroll">let angle = () => 360 * Math.random()</pre>
+<p>Earth will be drawn as a light blue circle with a radius of 7 pixels. In <code>SVG2</code>, animation is done on <code>&lt;g&gt;</code> elements, so we will create a group, and then add the circle to it:</p>
+<pre class="CodeScroll">let earth = svg.group("#0065fe");
+earth.circle("7", [1, 0]);</pre>
+<p>The circle is positioned 1 unit away from the origin so that it will orbit with the desired radius of 1. The animation is accomplished with the next line:</p>
+<pre class="CodeScroll">earth.config({animated: true, theta: angle(), omega: 20})</pre>
+<p>We call the group’s <code>config</code> method to set its <code>animated</code> property to <code>true</code>. This signals to <code>SVG2</code> that it needs to animate the group when the animation is playing. We use our <code>angle</code> function to rotate the Earth to a random angle. We do not need to specify a <code>pivot</code> point because this defaults to the origin.</p>
+<p>Omega (<i>ω</i>) is a Greek letter often used to represent <em>angular speed</em>. Setting this to 20 means that when the animation is running, the <code>theta</code> value will automatically change at a rate of 20° per second.</p>
+<p>We repeat these last three lines for Venus, changing the fill colour, circle size, orbital radius, and angular speed:</p>
+<pre class="CodeScroll">let venus = svg.group("lightgrey");
+venus.circle("6", [0.72, 0]);
+venus.config({animated: true, omega: 32, theta: angle()});</pre>
+
+<p>We now use <code>jquery</code> to give our <code>&lt;svg&gt;</code> element a black background, and an event listener for mouse clicks.</p>
+<pre class="CodeScroll">svg.$.css("background-color", "black").on("click", () => svg.toggle())</pre>
+<p>The expression <code>svg.$</code> refers to a <code>jquery</code> collection containing only our <code>&lt;svg&gt;</code> element. We are handling mouse click events by running <code>svg.toggle()</code>, which switches the animation between playing and paused.</p>
+<p>The final line automatically starts the animation when the <code>draw</code> function finishes:</p>
+<pre class="CodeScroll">svg.play()</pre>
+
+<p>In addition to the <code>shift</code>, <code>theta</code> and <code>omega</code> properties, motion of animated groups can be controlled with the <code>vel</code> (velocity), <code>acc</code> (acceleration) and <code>alpha</code> (angular acceleration) properties. The <code>shift</code>, <code>vel</code>, and <code>acc</code> values are 2-arrays specifying both <span class="TeX">x</span> and <span class="TeX">y</span> components.</p>
+
+</div></section>
+
+<section class="Post NoPrintIcon" data-icon="html5">   
+<h2 class="Collapse">Update Handlers</h2><div class="Collapse">
+<p>Under Construction</p>
+</div></section>
+
+<script type="text/javascript" data-init="draw">
+
+loadFeed.draw1 = () => {
+    // Create the animation
+    let svg = new SVG2("#Orbits", {lrbt: [-1.1, 1.1, -1.1, 1.1], scale: 160});
+
+    // Draw the Sun at the origin
+    SVG2.style(svg.circle("12"), "yellow");
+
+    // Define a function to make random angles
+    let angle = () => 360 * Math.random();
+
+    // Draw and animate Earth
+    let earth = svg.group("#0065fe");
+    earth.circle("7", [1, 0]);
+    earth.config({animated: true, theta: angle(), omega: 20});
+
+    // Draw and animate Venus
+    let venus = svg.group("lightgrey");
+    venus.circle("6", [0.72, 0]);
+    venus.config({animated: true, theta: angle(), omega: 32});
+
+    // Set background to black and pause/resume on mouse click
+    svg.$.css("background-color", "black").on("click", () => svg.toggle());
+
+    // Start the animation
+    svg.play();
+}
+
+loadFeed.draw = () => {
+    for (let i=1;i<2;i++) loadFeed[`draw${i}`]();
+}
+
+loadFeed.data = {
+    title: `SVG2 Tutorial 3: Animation`,
+    up: "home", prev: "svg2img", next: "svg2graph"
+}
+
+</script>

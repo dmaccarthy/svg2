@@ -1,0 +1,139 @@
+:root{
+    --blue: #0065fe;
+    --grey1: #f4f4f4;
+    --grey2: #d0d0d0;
+}
+
+body:not(.Present) .Present {display: none}
+.Center {text-align: center}
+.Left {text-align: left}
+.Right {text-align: right}
+.Hide {display: none}
+.Defn {text-decoration: underline}
+[data-aspect], .Wide {max-width: 96%}
+
+.MathSerif {
+    font-family: 'Noto Serif', 'Open Serif', 'Droid Serif', serif;
+}
+
+.TeX, .TeX_Pending {visibility: hidden}
+
+*[data-latex]:not(span) {
+    text-align: center;
+    /* margin: 1em auto; */
+}
+
+a[href], .Blue {color: var(--blue);}
+.Answer, .Red {color: red}
+.Comment {color: #999999}
+.DocString {color: green}
+.Grey {color: grey}
+.Black {color: black}
+.Ital {font-style: italic}
+.Bold {font-weight: bold}
+.NoBold {font-weight: normal}
+.NoWrap {white-space: nowrap}
+
+.Code, .CodeScroll, code {
+    font-family: Inconsolata, monospace;
+    font-weight:bold;
+}
+
+pre.Code, pre.CodeScroll {
+    background-color: var(--grey1);
+    margin-top: 0;
+    padding: 0.5em;
+    color: black;
+    overflow: auto;
+}
+
+pre.CodeScroll {max-height: 20em}
+
+.WideScroll, .AutoScroll {
+    margin: auto;
+    margin-bottom: 1em;
+    max-width: calc(100% - 2px);
+    overflow: auto;
+}
+
+table {
+    margin: auto;
+    border-collapse: collapse;
+}
+
+table.Two td, table.Two th {width: 50%}
+table.Three td {width: 33.33%}
+table.Four td {width: 25%}
+table.Five td {width: 20%}
+table.Six td {width: 16.667%}
+
+table td, table th {
+    min-width: 4em;
+    border: 1px solid black;
+    padding: 0.2em;
+}
+
+table.VectorTable {
+
+td, th {
+    text-align: center;
+    min-width: 6em;
+    width: 25%;
+}
+
+tr:not(.Resultant):nth-child(even) td:nth-child(even), tr:not(.Resultant):nth-child(odd) td:nth-child(odd)
+    {background-color: #ffe8e8}
+
+tr:not(.Resultant):nth-child(even) td:nth-child(odd), tr:not(.Resultant):nth-child(odd) td:nth-child(even)
+    {background-color: #ffd8d8}
+
+tr.Resultant td:nth-child(even) {background-color: #d8d8ff}
+tr.Resultant td:nth-child(odd) {background-color: #e8e8ff}
+
+tr:nth-child(even) th:nth-child(even), tr:nth-child(odd) th:nth-child(odd) {background-color: #e8e8e8}
+tr:nth-child(even) th:nth-child(odd), tr:nth-child(odd) th:nth-child(even) {background-color: #d8d8d8}
+
+}
+
+/* li p {margin-bottom: 0} */
+li > p {margin-bottom: 0}
+table.TD6 td {min-width: 6em}
+table.TD8 td {min-width: 8em}
+.Bottom {margin-bottom: 1em}
+.Top {margin-top: 1em}
+.NoBottom {margin-bottom: 0}
+.NoTop {margin-top: 0}
+div.Answer {margin-bottom: 0.75em}
+
+p.Answer {
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+}
+
+p.Caption {
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 0.5em;
+}
+
+td.Reveal span {color: red}
+body:is(.Present, .Slides) td.Reveal span {display: none}
+
+.w4, body.Present .s4 {width: 4em}
+.w5, body.Present .s5 {width: 5em}
+.w6, body.Present .s6 {width: 6em}
+body.Present .dot {width: 7.35em}
+.w8, body.Present .s8 {width: 8em}
+.w10, body.Present .s10 {width: 10em}
+.w11, body.Present .s11 {width: 11em}
+.w12, body.Present .s12 {width: 12em}
+.w14, body.Present .s14 {width: 14em}
+.w16, body.Present .s16 {width: 16em}
+.w18, body.Present .s18 {width: 18em}
+.w20, body.Present .s20 {width: 20em}
+.w22, body.Present .s22 {width: 22em}
+.w24, body.Present .s24 {width: 24em}
+.w28, body.Present .s28 {width: 28em}
+.w30, body.Present .s30 {width: 30em}
+.w32, body.Present .s32 {width: 32em}
+.w36, body.Present .s36 {width: 36em}

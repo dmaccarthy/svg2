@@ -1,0 +1,114 @@
+
+<section class="Post NoPrintIcon" data-icon="html5">   
+<h2 class="Collapse">class <code>SVGg</code></h2><div class="Collapse">
+
+<p>The methods listed below can be called on the <code>SVG2</code> instance or any group (<code>SVG2g</code>) instance to create basic shapes that correspond to a single element in the SVG drawing. These methods return a <code>jquery</code> collection representing the element.</p>
+<ul>
+    <li>circle</li>
+    <li>ellipse</li>
+    <li>line</li>
+    <li>path</li>
+    <li>poly</li>
+    <li>rect</li>
+    <li>star</li>
+    <li>text</li>
+</ul>
+
+<p>These methods add images to your drawing. Because the browser loads images asynchronously, they return a <code>Promise</code> rather than a <code>jquery</code> collection.</p>
+<ul>
+    <li>image</li>
+    <li>mjax<!-- / mj--></li>
+
+</ul>
+
+<p>These methods produce composite shapes. They typically return a <em>group</em> (an instance of <code>SVG2g</code>) usually composed of more than one child element.</p>
+<ul>
+    <li>arrow</li>
+    <li>chevron</li>
+    <li>coil</li>
+    <li>cylinder</li>
+    <li>edot</li>
+    <li>energy_flow</li>
+    <li>error_bar_x</li>
+    <li>error_bar_y</li>
+    <li>graph</li>
+    <li>label</li>
+    <li>locus</li>
+    <li>plot</li>
+    <li>pm</li>
+    <li>ray</li>
+    <li>ruler</li>
+    <li>stickman</li>
+    <li>tip_to_tail</li>
+</ul>
+
+<p>There are also static functions that create an entire drawing and return a new <code>SVG2</code> instance...</p>
+
+<ul>
+    <li>ebg</li>
+    <li>vec_diag</li>
+</ul>
+
+</div></section>
+
+<!-- <section class="Post NoPrintIcon" data-icon="html5">   
+<h2 class="Collapse">class <code>SVG2</code></h2><div class="Collapse">
+<p>The <code>SVG2.js</code> script depends on <a href="https:/jquery.com" target="jQ">jQuery</a> and on the scripts <code>util.js</code>, <code>math.js</code> and <code>bdata.js</code>.</p>
+<p>The <code>SVG2</code> class associates a drawing or animation with an <code>&lt;svg&gt;</code> tag in the HTML document. It is a subclass of <code data-feed="svg2g">SVG2g</code>.</p>
+<p>The data attributes of each instance, in addition to those inherited from <code>SVG2g</code> are:</p>
+<ul>
+    <li><code>angleDir</code>: Equal to <code>-1</code> when the <i>y</i>-axis is counterclockwise from the <i>x</i>-axis and <code>1</code> when clockwise.</li>
+    <li><code>decimals</code>: The number of decimal places to round coordinates and angles when writing to the <code>&lt;svg&gt;</code> element and its descendants. Default <code>2</code>.</li>
+    <li><code>defs</code>: A jQuery object representing the <code>&lt;defs&gt;</code> element(s) of the drawing.</li>
+    <li><code>frameCount</code>: The number of animation frames that have been completed.</li>
+    <li><code>frameRate</code>: The animation playback speed in frames per second. Default <code>60</code>.</li>
+    <li><code>lrbt</code>: A 4-array specifying the coordinates of the left, right, bottom, and top edges of the drawing, excluding the margin.</li>
+    <li><code>playing</code>: A boolean value indicating whether the animation is playing (<code>true</code>) or paused (<code>false</code>).</li>
+    <li><code>scale</code>: A 2-array describing the <i>x</i>- and <i>y</i>-scales in pixels per unit.</li>
+    <li><code>time</code>: The animation time.</li>
+    <li><code>timeFactor</code>: A ratio of the animation time to real time. Default <code>1</code>.</li>
+    <li><code>unit</code>: Root mean square of the <code>scale</code> values.</li>
+
+</ul>
+</div>
+</section>
+
+<section class="Post NoPrintIcon" data-icon="html5">   
+<h2 class="Collapse Code">new SVG2(selector, options)</h2>
+<div class="Collapse">
+<p>The arguments for the <code>SVG2</code> constructor are:</p>
+<ul>
+    <li><code>selector</code>: A jQuery selector identifying the <code>&lt;svg&gt;</code> element to associate with the <code>SVG2</code> instance. If the selector matches more than one <code>&lt;svg&gt;</code> element, the instance will be associated with the first match.</li>
+    <li><code>options</code>: An object containing the following attributes...
+    <ul>
+        <li><code>size</code>: The width and height of the drawing in pixels as a 2-array.</li>
+        <li><code>lrbt</code>: A 4-array specifiying the coordinates of the left, right, bottom and top of the drawing. If the top and bottom coordinates are omitted, they will be calculated to ensure that the <i>x</i>- and <i>y</i>-axes have the same scale.</li>
+        <li><code>scale</code>: A number or 2-array specifying the desired scale or scales for the drawing in pixels per unit. This will be used with <code>lrbt</code> and <code>margin</code> to calculate the drawing size if the <code>size</code> attribute is not provided.</li>
+        <li><code>margin</code>: A number of 4-array specifying the number of edge pixels to exclude from the coordinate system as specfiied by <code>lrbt</code>.</li>
+        <li><code>grid</code>: A number of 2-array specifying the <i>x</i>- and <i>y</i>-interval for the coordinate grid.</li>
+        <li><code>appendAxes</code>: </li>
+        <li><code>noAxes</code>: </li>
+    </ul></li>
+</ul>
+
+<pre class="Code" data-echo="js">let svg = new SVG2("#id", {
+    size: [640, 360],
+    lrbt: [-10, 10, -2, 2],
+    grid: 1,
+    margin: 2
+});
+</pre>
+
+<p>The <code>options</code> argument is an object with the following attributes:</p>
+
+</div>
+</section> -->
+
+<script type="text/javascript" data-initx="draw">
+
+loadFeed.data = {
+    title: `SVG2 Reference`,
+    up: "home",
+}
+
+</script>

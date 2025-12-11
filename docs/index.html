@@ -1,3 +1,50 @@
-<html>
-  
+<!DOCTYPE html>
+<html lang="en-ca">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SVG2 Documentation</title>
+<script type="text/javascript">
+
+// MathJax configuration
+
+window.MathJax = {
+    startup: {typeset: false},
+    loader: {load: ['[tex]/color', '[tex]/cancel']},
+    tex: {packages: {'[+]': ['color', 'cancel']}}
+};
+
+</script>
+<script type="text/javascript" async="async" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-svg.js"></script>
+<link rel="shortcut icon" type="image/svg+xml" href="media/rocket.svg" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto+Sans:400,700,400italic,700italic"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto+Serif:400,700,400italic,700italic" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inconsolata:400,700"/>
+<link rel="stylesheet" href="lib/common.css"/>
+<link rel="stylesheet" href="lib/feed.css"/>
+<script type="text/javascript" src="dist/svg2-0.1.0-alpha-min.js"></script>
+<script type="text/javascript" src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script type="text/javascript" src="media/dataimg.js"></script>
+<script type="text/javascript" src="lib/feed-min.js"></script>
+<style type="text/css">
+
+#Top, #Main, #Copy {display:none}
+#Copy {font-size: 80%}
+
+</style>
+<script type="text/javascript">
+
+</script>
+</head>
+<body>
+<nav id="Top">
+<span id="TopTitle">SVG2 Documentation</span>
+<span id="Buttons">
+    <a data-id="prev" title="Click to go to the previous lesson"><img src="media/prev.svg"/></a>
+    <a data-id="next" title="Click to go to the next lesson"><img src="media/next.svg"/></a>
+</span>
+</nav>
+<article id="Main"></article>
+<p class="Center" id="Copy">© 2022-2025 by <a href="mailto:sc8pr.py@gmail.com">D.G. MacCarthy</a></p>
+</body>
 </html>
