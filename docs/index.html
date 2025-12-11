@@ -22,9 +22,13 @@ window.MathJax = {
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inconsolata:400,700"/>
 <link rel="stylesheet" href="lib/common.css"/>
 <link rel="stylesheet" href="lib/feed.css"/>
-<script type="text/javascript" src="dist/svg2-0.1.0-alpha-min.js"></script>
 <script type="text/javascript" src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<!-- <script type="text/javascript" src="lib/src/util.js"></script>
+<script type="text/javascript" src="lib/src/math.js"></script>
+<script type="text/javascript" src="lib/src/svg2.js"></script> -->
+<script type="text/javascript" src="dist/svg2-0.1.0-dev0-min.js"></script>
 <script type="text/javascript" src="media/dataimg.js"></script>
+<!-- <script type="text/javascript" src="lib/src/feed.js"></script> -->
 <script type="text/javascript" src="lib/feed-min.js"></script>
 <style type="text/css">
 
@@ -33,6 +37,19 @@ window.MathJax = {
 
 </style>
 <script type="text/javascript">
+
+mediaURL.urls = {svg: data_images.svg}
+
+function initPage(latex) {
+    renderTeX = e => mjax_render(e).then(layoutWidth);
+    loadHash(true);
+    document.getElementById("TopTitle").addEventListener("click", goUp);
+}
+
+$(async () => {
+    mjax_wait().then(initPage);
+});
+
 
 </script>
 </head>

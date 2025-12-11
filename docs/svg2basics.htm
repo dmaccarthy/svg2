@@ -1,14 +1,14 @@
-<section class="Post NoPrintIcon" data-icon="html5">   
+<section class="Post NoPrintIcon" data-icon="svg">   
 <h2 class="Collapse">Creating an <code>SVG2</code> Drawing</h2><div class="Collapse">
 
-<p>Download the <a href="https://dmaccarthy.github.io/svg2/dist/svg2-0.1.0-alpha-min.js">SVG2 distribution</a> into your source folder and included it and <code>jquery</code> in your HTML5 document.</p>
+<p>Download the <a href="dist/svg2-0.1.0-dev0-min.js" download="svg2-0.1.0-dev0-min.js">SVG2 distribution</a> into your project folder and include it and <code>jquery</code> in your HTML5 document.</p>
 <pre class="Code" data-echo="html">&lt;script type="text/javascript" src="https://code.jquery.com/jquery-3.7.1.min.js"&gt;&lt;/script&gt;
-&lt;script type="text/javascript" src="svg2-0.1.0-alpha-min.js"&gt;&lt;/script&gt;</pre>
+&lt;script type="text/javascript" src="svg2-0.1.0-dev0-min.js"&gt;&lt;/script&gt;</pre>
 
 <p>Create an <code>&lt;svg&gt;</code> tag somewhere in the body of your document:</p>
 <pre class="Code" data-echo="html">&lt;p&gt;&lt;svg id="Drawing1"&gt;&lt;/svg&gt;&lt;/p&gt;</pre>
 
-<p>In your Javascript, create an instance of the <code>SVG2</code> class and associate it with the <code>&lt;svg&gt;</code> tag using a selector for its <code>id</code> attribute:</p>
+<p>In your Javascript, create a new <code>SVG2</code> instance and associate it with the <code>&lt;svg&gt;</code> element using its <code>id</code> attribute:</p>
 <pre class="Code" data-echo="js">function draw() {
     let svg = new SVG2("#Drawing1", {
         lrbt: [-5, 5, -5, 5],
@@ -23,7 +23,7 @@
 
 $(draw); <span class="Comment">// Run the function when document is loaded</span></pre>
 
-<p>The first argument to the <code>SVG2</code> constructor is the selector that identifies the <code>&lt;svg&gt;</code> element you want to use.</p>
+<p>The first argument to the <code>SVG2</code> constructor is a selector that identifies the <code>&lt;svg&gt;</code> element you want to use.</p>
 <p>The second argument is an object describing the <code>SVG2</code> instance’s configuration.</p>
 
 <p>Alternatively, if you do not want to use an existing <code>&lt;svg&gt;</code> tag for your drawing, you can call the static function <code>SVG2.create</code> instead of the constructor, to create a new element and then add it to your document:</p>
@@ -54,7 +54,7 @@ $("body").append(svg.element);</pre>
 <p class="Center"><svg id="Drawing1"></svg></p>
 </div></section>
 
-<section class="Post NoPrintIcon" data-icon="html5">   
+<section class="Post NoPrintIcon" data-icon="svg">   
 <h2 class="Collapse">Adding Shapes</h2><div class="Collapse">
 
 <p>After creating your <code>SVG2</code> instance as in the previous section, you can draw basic shapes by adding instructions like the following to your <code>draw</code> function:</p>
@@ -80,7 +80,7 @@ svg.poly([[0, 0], [-2, 4], [1, 3]]);</pre>
 <p>The <code>poly</code> method draws either a closed <code>&lt;polygon&gt;</code> or open <code>&lt;polyline&gt;</code>. The first argument is an array of points to connect. The optional second argument is a boolean value specifying whether to draw a closed (<code>true</code>) or open (<code>false</code>, default) shape. Alternatively, the second argument can describe an existing <code>&lt;polygon&gt;</code> or <code>&lt;polyline&gt;</code> element to be modified.</p>
 </div></section>
 
-<section class="Post NoPrintIcon" data-icon="html5">   
+<section class="Post NoPrintIcon" data-icon="svg">   
 <h2 class="Collapse">Styling the Shapes</h2><div class="Collapse">
 
 <p>Since the <code>line</code>, <code>circle</code>, <code>ellipse</code>, <code>rect</code>, and <code>poly</code> methods all return <code>jquery</code> collections, you can use the <code>jquery.css</code> method to set the <code>fill</code>, <code>stroke</code> and <code>stroke-width</code> style attributes.</p>
@@ -107,7 +107,7 @@ SVG2.style(svg.poly([[0, 0], [-2, 4], [1, 3]]), "none", "limegreen@1");</pre>
 
 </div></section>
 
-<section class="Post NoPrintIcon" data-icon="html5">   
+<section class="Post NoPrintIcon" data-icon="svg">   
 <h2 class="Collapse">Anchoring</h2><div class="Collapse">
 <p>Many elements — including circles, rectangles, and images — are positioned by their centres by default. As the example below shows, you can change the anchor point of the shape by adding additional information to the position argument.</p>
 <pre class="Code" data-echo="js">SVG2.style(svg.rect([4, 2], [0, 0]), "red@3", "none");
@@ -124,7 +124,7 @@ SVG2.style(svg.rect([4, 2], [0, 0, <span class="Blue">0, 0</span>]), "#0065fe@3"
 <p class="Center"><svg id="Drawing8"></svg></p>
 </div></section>
 
-<section class="Post NoPrintIcon" data-icon="html5">   
+<section class="Post NoPrintIcon" data-icon="svg">   
 <h2 class="Collapse">Grouping &amp; Transforming</h2><div class="Collapse">
 
 <p>The SVG <code>&lt;g&gt;</code> element is used to group items. You can apply styles to a group, which are then inherited by the contents of the group rather than having to style each item individually. You can also use groups to translate, rotate, and animate parts of the drawing.</p>
@@ -140,7 +140,7 @@ SVG2.style(svg.poly([[0, 0], [-2, 4], [1, 3]]), "none", "red@2");</pre>
 <p>In this example, we create a group <code>blue</code> by calling the <code>svg.group</code> method, which appends a new <code>&lt;g&gt;</code> element to the <code>&lt;svg&gt;</code>. The argument list contains the style information to be applied to the group. We then create our shapes by running the <code>circle</code>, <code>rect</code> and other methods on the group identified by <code>blue</code> rather than on <code>svg</code>, to append new elements to the <code>&lt;g&gt;</code> element.</p>
 <p>Note that the <code>poly</code> method in the final line was called on <code>svg</code> rather than <code>blue</code>, so the <code>polyline</code> will not be part of the group, will not inherit its styles, and will not move or rotate with the group.</p>
 
-<p>Groups have a <code>config</code> method that we can use to shift and rotate the group. Adding the following line of code will rotate the entire group by 45° counterclockwise using the coordinates <code>[3, 1]</code> as the pivot point (the centre of the circle), and then translate the entire group one unit to the left, and one unit up. Theta (<i>θ</i>) is the Greek letter often used to represent angles in mathematics.</p>
+<p>Groups have a <code>config</code> method that we can use to shift and rotate the group. Adding the following line of code will rotate the entire group by 45° counterclockwise using the centre of the circle (coordinates <code>[3, 1]</code>) as the pivot point, and then translate the entire group one unit to the left, and one unit up. Theta (<i>θ</i>) is the Greek letter often used to represent angles in mathematics.</p>
 <pre class="Code" data-echo="js">blue.config({theta: 45, pivot: [3, 1], shift: [-1, 1]});</pre>
 <p class="Center"><svg id="Drawing5"></svg></p>
 
