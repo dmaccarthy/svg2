@@ -407,7 +407,8 @@ function loadHash(init) {
 function collapse(e) {
 /** Toggle collapsible sections **/
     let alt = e.altKey && e.ctrlKey;
-    if (e.target != e.currentTarget) return;
+    if ($(e.target).closest(".Action").length) return;
+    // if (e.target != e.currentTarget) return;
     let div = $(e.currentTarget).next("div.Collapse");
     if (!alt || div.is(":hidden")) {
         div.fadeToggle(250, () => {

@@ -61,9 +61,48 @@ venus.config({animated: true, omega: 32, theta: angle()});</pre>
 </div></section>
 
 <section class="Post NoPrintIcon" data-icon="svg">   
-<h2 class="Collapse">Update Handlers</h2><div class="Collapse">
-<p>Under Construction</p>
+<h2 class="Collapse">Customizing the Animation</h2><div class="Collapse">
+<p>Now we will add a timer to the animation by adding a few extra lines to the <code>draw</code> function from the previous example.</p>
+<pre class="Code" data-echo="js">let textStyle = ["mono", 20, "bold", "white"];
+let timer = svg.text("0.00 yr", [1, 1, "topright"], 0, textStyle).config({animated: true});
+
+timer.beforeupdate = function() {
+    let years = svg.frameCount / (360 / earth.omega * svg.frameRate);
+    this.config({text: `${years.toFixed(2)} yr`});
+}
+</pre>
+<p>Here is the animation now:</p>
+<p class="Center"><svg id="Timer"></svg></p>
+
+<p>We add an <code>SVG2text</code> instance to the drawing, using the variable <code>timer</code> to reference it, and call its <code>config</code> method to set its <code>animated</code> property to <code>true</code>. Initially, the text reads <code>"0.00 yr"</code>.</p>
+<pre class="Code" data-echo="js">let textStyle = ["mono", 20, "bold", "white"];
+let timer = svg.text("0.00 yr", [1, 1, "topright"], 0, textStyle).config({animated: true});</pre>
+
+<p>Next we define a function to update the timer, and set it as the <code>timer.beforeupdate</code> property. <code>SVG2</code> will run this function prior to drawing each frame of the animation.</p>
+
+<p>Next we calculate how many “years” have passed based on how many frames of the animation have been drawn.</p>
+<pre class="Code" data-echo="js">let years = svg.frameCount / (360 / earth.omega * svg.frameRate);</pre>
+
+<p>We calculate <code>360 / earth.omega</code> to find out how many seconds it takes Earth to complete one orbit; if <code>earth.omega</code> is 20 degrees per second, a full 360° will take 18 seconds. If we multiply by <code>svg.frameRate</code>, this will tell us how many frames are drawn over one complete Earth orbit. The default frame rate is 60 frames per second, so 18 seconds corresponds to 1080 frames. Dividing the total number of frames drawn, <code>svg.frameCount</code>, by this number gives us the number of years to display on the timer.</p>
+
+<p>We update the time shown on the timer by calling its <code>config</code> method:</p>
+<pre class="Code" data-echo="js">this.config({text: `${years.toFixed(2)} yr`});</pre>
+
+<p>By defining the <code>beforeupdate</code> function using the <code>function</code> keyword, the <code>this</code> keyword will refer to <code>timer</code> within the scope of the function. If the function is defined using the <code>=></code> operator instead, <code>this</code> will refer to the browser <code>window</code> object.</p>
+
 </div></section>
+
+<section class="Post NoPrintIcon" data-icon="svg">   
+<h2 class="Collapse">Updating</h2><div class="Collapse">
+
+<p>You can define a <code>beforeupdate</code> and an <code>afterupdate</code> function for each animated group, and for the <code>SVG2</code> instance itself.</p>
+
+<p>The <code>SVG2</code> instance keeps an array of animated items that can be referenced as <code>svg.items</code>. As each frame of the animation is drawn, the <code>SVG2</code> instance’s <code>beforeupdate</code> function is called first. Then the first animated item’s <code>beforeupdate</code> function is called. This item’s kinematics properties (<code>theta</code>, <code>omega</code>, <code>shift</code>, <code>vel</code>) are then updated, and then its <code>afterupdate</code> function is called. Then the same procedure is applied to each of the remaining animated items in order. Finally, the <code>SVG2</code> instance’s <code>afterupdate</code> function is called.</p>
+
+<p>Items are appended to the array whenever their <code>animated</code> property is set to <code>true</code>, and removed when set to <code>false</code>. This will determine the order in which the <code>beforeupdate</code> and <code>afterupdate</code> functions are called.</p>
+
+</div></section>
+
 
 <script type="text/javascript" data-init="draw">
 
@@ -91,11 +130,34 @@ loadFeed.draw1 = () => {
     svg.$.css("background-color", "black").on("click", () => svg.toggle());
 
     // Start the animation
-    svg.play();
+    return svg.play();
+}
+
+loadFeed.draw2 = () => {
+    let svg = new SVG2("#Timer", {lrbt: [-1.1, 1.1, -1.1, 1.1], scale: 160});
+    SVG2.style(svg.circle("12"), "yellow");
+    let angle = () => 360 * Math.random();
+    let earth = svg.group("#0065fe");
+    earth.circle("7", [1, 0]);
+    earth.config({animated: true, theta: angle(), omega: 20});
+    let venus = svg.group("lightgrey");
+    venus.circle("6", [0.72, 0]);
+    venus.config({animated: true, theta: angle(), omega: 32});
+
+    let textStyle = ["mono", 20, "bold", "white"];
+    let timer = svg.text("0.00 yr", [1, 1, "topright"], 0, textStyle).config({animated: true});
+
+    timer.beforeupdate = function() {
+        let years = svg.frameCount / (360 / earth.omega * svg.frameRate);
+        this.config({text: `${years.toFixed(2)} yr`});
+    }
+
+    svg.$.css("background-color", "black").on("click", () => svg.toggle());
+    return svg.play();
 }
 
 loadFeed.draw = () => {
-    for (let i=1;i<2;i++) loadFeed[`draw${i}`]();
+    for (let i=1;i<3;i++) loadFeed[`draw${i}`]();
 }
 
 loadFeed.data = {

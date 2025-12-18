@@ -1,712 +1,3 @@
-/*** (c) 2023-2025 by D. G. MacCarthy [https://github.com/dmaccarthy/svg2] ***/
-
-/** util.js **/
-
-Array.prototype.item = function(i) {return this[i < 0 ? i + this.length : i]}
-
-function jeval(a) {return JSON.parse(`{"a": ${a}}`).a}
-
-function jeval_frac(s) {
-    s = s.split("/");
-    return jeval(s[0]) / (s.length > 1 ? jeval(s[1]) : 1);
-}
-
-function click_cycle(e, n, ...f) {
-    e.cycleStatus = n;
-    $(e).click((ev) => {
-        let back = ev.ctrlKey;
-        let n = f.length;
-        e.cycleStatus += back ? -1 : 1;
-        if (e.cycleStatus < 0) e.cycleStatus = n - 1;
-        else if (e.cycleStatus >= n) e.cycleStatus = 0;
-        let i = back ? 0 : e.cycleStatus;
-        while (i <= e.cycleStatus) f[i++]();
-    });
-}
-
-click_cycle.toggle = (items, show, ...n) => {
-    let svg;
-    try {svg = items instanceof SVG2 ? items : null}
-    catch(err) {}
-    for (let i of n) {
-        let e = svg ? svg.$.find(`.Toggle${i}`) : $(items[i]);
-        if (show) e.fadeIn();
-        else if (show == null) e.fadeToggle();
-        else e.fadeOut();
-    }
-}
-
-const range = function*(x0, x1, dx) {
-    // Generate a sequence like Python's range function
-    if (x1 == null) {x1 = x0; x0 = 0}
-    if (!dx) dx = x0 < x1 ? 1 : -1;
-    while (dx > 0 && x0 < x1 || dx < 0 && x0 > x1) {
-        yield x0;
-        x0 += dx;
-    }
-}
-
-function qs_args(key, str) {
-    // Convert query string to object
-    let args = {};
-    for (let [k, v] of new URLSearchParams(str ? str : location.search)) args[k] = v;
-    return key ? args[key] : args;
-}
-
-function item_aspect(ei, w) {
-    // Adjust height(width) of element to maintain aspect ratio
-    ei = $(ei);
-    let a = jeval_frac(ei.attr("data-aspect"));
-    if (w) {
-        ei.css({width: ''});
-        let w1 = Math.round(ei.height() * a);
-        if (w1 != ei.width()) ei.width(w1);
-    }
-    else {
-        ei.css({height: ''});
-        let h = Math.round(ei.width() / a);
-        if (h != ei.height()) ei.height(h);
-    }
-}
-
-function aspect(w) {
-    let e = $("[data-aspect]");
-    for (let i=0;i<e.length;i++) item_aspect(e[i], w)
-}
-
-
-const random_string = (n, allowNum) => {
-// allowNum = 1: numerals are allowed
-// allowNum = 2: allowed except for first character
-    let s = "";
-    if (allowNum == 2) {
-        s = random_string(1);
-        n--;
-    }
-    while (n--) {
-        let i = Math.floor((allowNum ? 62 : 52) * Math.random());
-        i = (i < 26 ? 65 : (i < 52 ? 97 : 48)) + i % 26;
-        s += String.fromCharCode(i);
-    }
-    return s;
-}
-
-function* _zip(x, y, rarray) {
-    let xa = x instanceof Array;
-    let ya = y instanceof Array;
-    let n = xa ? x.length : y.length;
-    for (let i=0;i<n;i++) {
-        let xi = xa ? x[i] : x;
-        let yi = ya ? y[i] : y;
-        yield rarray ? new RArray(xi, yi) : [xi, yi];
-    }
-}
-
-function zip(x, y, rarray) {return [..._zip(x, y, rarray)]}
-
-function unzip(data, rarray) {
-    let dim = data[0].length;
-    let udata = new Array(dim);
-    for (let i=0;i<udata.length;i++) udata[i] = rarray ? new RArray() : [];
-    for (let j=0;j<data.length;j++)
-        for (let i=0;i<dim;i++) udata[i].push(data[j][i]);
-    return udata;
-}
-
-function unicode_to_base64(utext) {
-    let data = new TextEncoder().encode(utext);
-    return btoa(String.fromCharCode(...data));
-}
-
-
-/*** Math rendering with MathJax or KaTeX ***/
-
-function katex_render(e, opt) {
-    // Render TeX math with KaTeX
-    e = $(e ? e : ".TeX").removeClass("TeX");
-    for (let ei of e) {
-        let e$ = $(ei);
-        let tex = e$.text();
-        e$.attr("data-latex", tex);
-        let options = {displayMode: e$.is("p, div, .Display"), throwOnError: false};
-        if (opt) Object.assign(options, opt);
-        katex.render(tex, ei, options);
-    }
-    if (katex_render.hideEqNum) $("[data-latex]:is(p, div) .eqn-num").hide();
-}
-
-katex_render.hideEqNum = true;
-
-async function mjax_render(e, mode) {
-    // Render TeX math with MathJax
-    // mode = 0 => <svg>
-    // mode = 1 => <mjx-container><svg>
-    e = $(e ? e : ".TeX").addClass("TeX_Pending").removeClass("TeX");
-    let p = [];
-    for (let ei of e) {
-        let e$ = $(ei);
-        let tex = e$.text();
-        e$.attr("data-latex", tex);
-        f = mode ? mj => $(mj) : mj => $(mj).find("svg");
-        p.push(MathJax.tex2svgPromise(tex).then(mj => e$.removeClass("TeX_Pending").html(f(mj)[0])));
-    };
-    return new Promise(async res => {
-        for (let i=0;i<p.length;i++) await p[i];
-        res();
-    });
-}
-
-async function mjax_wait(t) {
-    // Wait until MathJax.typesetPromise is available
-    while (!MathJax.typesetPromise) await SVG2.sleep(t ? t : 50);
-    return new Promise(res => res());
-}
-
-async function mjax_svg(tex) {
-    // Use MathJax to render LaTeX as SVG; return jquery object containing <svg>
-    return MathJax.tex2svgPromise(tex).then(a => $($(a).find("svg")[0]));
-}
-
-async function mjax_url(tex) {
-    // Use MathJax to render LaTeX as an SVG data URL
-    return mjax_svg(tex).then(svg => "data:image/svg+xml;base64," + unicode_to_base64(svg[0].outerHTML));
-}
-
-function mjax_img(tex) {
-    // Use MathJax to render LaTeX as SVG; return jquery object containing <img>
-    return mjax_url(tex).then(u => $("<img>").attr({src: u}));
-}
-
-renderTeX = mjax_render;
-
-
-async function load_img(url) {
-    return new Promise(res => {
-        let img = new Image();
-        img.addEventListener("load", () => res(img));
-        img.src = url;
-    });
-}
-
-
-/*** Convert data to a Blob instance and give it a save method...
- * 
- *  blobify("Hello, world!", "text/plain").then(b => b.save("hello.txt"))
- *  blobify(canvas, "image/jpeg").then(b => b.save("image1.jpg"))
- *  blobify(img2canvas(img, [512, 288]), "image/png").then(b => b.save("image2.png"))
- *  blobify(blob).then(b => b.save())
- ***/
-
-async function blobify(data, ...args) {return new Promise(res => {
-    if (data instanceof Blob) {
-        data.save = blobify._save;
-        res(data);
-    }
-    else if (data.toBlob) data.toBlob(blob => {
-        blob.save = blobify._save;
-        res(blob);
-    }, ...args);
-    else {
-        let blob = new Blob([data], {"type": args.length ? args[0] : "text/plain"});
-        blob.save = blobify._save;
-        res(blob);
-    }
-})}
-
-blobify._save = function(filename) {
-    let url = URL.createObjectURL(this);
-    if (filename) $("<a>").attr({href: url, download: filename})[0].click();
-    else window.open(url);
-    URL.revokeObjectURL(url);
-}
-
-blobify.mime = (f) => {
-    let m = {
-        "html": "text/html",
-        "htm": "text/html",
-        "js": "text/javascript",
-        "css": "text/css",
-        "csv": "text/csv",
-        "py": "text/python",
-        "svg": "image/svg+xml",
-        "png": "image/png",
-        "jpg": "image/jpeg",
-        "webp": "image/webp",
-        "json": "application/json",
-        "xml": "application/xml",
-        "pdf": "application/pdf",
-        "zip": "application/zip",
-    }[f.split(".").pop().toLowerCase()];
-    return m ? m : "text/plain";
-}
-
-function img2canvas(img, size) {
-    /* Scale an image (if requested) and draw it to a new canvas */
-    if (!size) size = 1;
-    if (!(size instanceof Array)) {
-        let j = $(img);
-        size = [Math.round(size * j.width()), Math.round(size * j.height())];
-    }
-    let [w, h] = size;
-    if (w * h == 0) throw("Image has a dimension of 0");
-    let cv = $("<canvas>").attr({width: w, height: h})[0];
-    let cx = cv.getContext("2d");
-    cx.drawImage(img, 0, 0, w, h);
-    return cv;
-}
-
-/*** Fetch images or other data as blobs or data URLs... 
-*
-* load_blobs("video.png", "print.svg").then(console.log);
-* load_dataURLs("video.png", "print.svg").then(console.log);  
-*
-***/
-
-async function load_one_blob(url, dataURL) {
-    return new Promise((resolve, reject) => {
-        fetch(url).then(r => r.blob().then(b => {
-            if (!r.ok) reject(b);
-            else {
-                if (dataURL) {
-                    const reader = new FileReader();
-                    reader.onloadend = r => resolve(r.target.result);
-                    reader.readAsDataURL(b);            
-                }
-                else resolve(b);                
-            }
-        }));
-    });  
-}
-
-async function _load_blobs(dataURL, ...args) {
-    let data = {}, promises = {};
-    for (let a of args)
-        promises[a] = load_one_blob(a, dataURL).then(b => data[a] = b, () => data[a] = null);
-    for (let a of args) await promises[a];
-    return new Promise((resolve) => {resolve(data)});
-}
-
-async function load_blobs(...args) {return _load_blobs(0, ...args)}
-async function load_dataURLs(...args) {return _load_blobs(1, ...args)}
-
-function code_echo(e, action) {
-    /** Preview code in browser or copy to clipboard **/
-    let text = e.text();
-    if (!action) navigator.clipboard.writeText(text).then(
-        () => msg("Text copied to clipboard"), () => msg("Unable to copy text"));
-    else {
-        let echo = e.attr("data-echo");
-        let fExt = echo.split('.').pop();
-        if (echo == fExt) echo = random_string(12, 1) + '.' + fExt;
-        if (fExt == "html" || fExt == "htm") {
-            if (text.search("</body>") == -1) text = `<body>\n${text}\n</body>`;
-            if (text.search("</head>") == -1) text = `${code_echo.head}\n${text}\n`;
-            if (text.search("</html>") == -1) text = `${code_echo.html}\n${text}\n</html>`;
-        }
-        blobify(text, blobify.mime(fExt)).then(b => b.save(action == 2 ? echo : null));
-    }
-}
-
-code_echo.html = `<!DOCTYPE html>
-<html lang="en-ca">`;
-
-code_echo.head = `<head>
-<meta charset="utf8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>HTML Document</title>
-<link rel="shortcut icon" type="image/svg+xml" href="https://upload.wikimedia.org/wikipedia/commons/6/61/HTML5_logo_and_wordmark.svg"/>
-</head>`;
-
-
-/** math.js **/
-
-const pi = Math.PI, DEG = pi / 180, RAD = 180 / pi;
-const twoPi = 2 * pi, halfPi = pi / 2, quarterPi = pi / 4;
-
-
-class RArray extends Array {
-
-static add(...args) {
-    let a = new RArray();
-    let dim = args[0].length;
-    for (let i=0;i<dim;i++) {
-        let s = 0;
-        for (let j=0;j<args.length;j++) s += args[j][i];
-        a.push(s);
-    }
-    return a;
-}
-
-static convert(...args) {
-    let c = [];
-    for (let a of args) c.push(new RArray(...a));
-    return c;
-}
-
-sum() {
-    let n = this.length, s = 0;
-    if (n) {
-        s = this[0];
-        for (let i=1; i<n; i++) s += this[i];
-    }
-    return s;
-}
-
-minmax() {
-    let min = this[0];
-    let max = min;
-    for (let i=0;i<this.length;i++) {
-        if (this[i] < min) min = this[i];
-        if (this[i] > max) max = this[i];
-    }
-    return {min: min, max: max};
-}
-
-extend(a) {
-    this.push.apply(this, a);
-    return this;
-}
-
-remove(val, removeAll) {
-    let loop = true;
-    while (loop) {
-        let i = this.indexOf(val);
-        if (i >= 0) this.splice(i, 1);
-        if ((i == -1) || (!removeAll)) loop = false;
-    }
-    return this;
-}
-
-times(s) {
-    let sa = s instanceof Array;
-    let a = new RArray();
-    for (let i=0;i<this.length;i++)
-        a.push(this[i] * (sa ? s[i] : s));
-    return a;
-}
-
-neg() {return this.times(-1)}
-plus(a) {return RArray.add(this, a)}
-
-minus(a) {
-    let d = new RArray();
-    for (let i=0;i<this.length;i++) {
-        d.push(this[i] - a[i]);
-    }
-    return d;
-}
-
-dot(a) {
-    let s = 0
-    for (let i=0;i<this.length;i++) s += this[i] * a[i];
-    return s;
-}
-
-mag() {return Math.sqrt(this.dot(this))}
-
-dir() {
-    if (this.length != 2) throw("ValueError: operation applies only to arrays of length 2");
-    return atan2(this[1], this[0]);
-}
-
-// get matrix() {return new Matrix([this])}
-
-tr(p, scale) {
-    if (!p) p = 4;
-    let tr = $("<tr>");
-    let nums = [this.mag(), this.dir(), this[0], this[1]];
-    for (let n of nums) {
-        if (scale) n *= scale;
-        tr.append($("<td>").html(n.toPrecision(p)));
-    }
-    return tr;
-}
-    
-}
-
-
-function xy_limits(...vecs) {
-/* Find maxima and minima coordinates for vector addition */
-    let pt = new RArray(0, 0);
-    let sums = [pt];
-    for (let v of vecs) {
-        pt = pt.plus(v);
-        sums.push(pt);
-    }
-    let [x, y] = unzip(sums, true);
-    x = x.minmax();
-    y = y.minmax();
-    return {x: x, y: y, center: [(x.min + x.max) / 2, (y.min + y.max) / 2], size: [x.max - x.min, y.max - y.min]};
-}
-    
-
-function* fn_eval(f, x) {for (let xi of x) yield f(xi)}
-function uniform(a, b) {return a + (b - a) * Math.random()}
-
-function randint(a, b) {
-    if (b == null) {b = a; a = 0}
-    return a + Math.floor((b + 1 - a) * Math.random())}
-
-function shuffle(a) { // Re-order array randomly, in-place
-    for (let i=a.length-1; i>0;i--) {
-        let j = randint(i + 1);
-        [a[i], a[j]] = [a[j], a[i]];
-    }
-}
-
-function arrow_points(L, opt) {
-    /* Calculate the vertices of an arrow. See: www.desmos.com/calculator/kr61ws62tm
-       opt = {tail, head, angle, shape, double} */
-    if (!opt) opt = {};
-    let A = (opt.angle ? opt.angle : 35) * DEG;
-    let T = opt.tail ? opt.tail : L/14;
-    if (T < 0) T *= -L;
-    let H = opt.head ? opt.head : 4 * T;
-    let c = Math.cos(A), s = Math.sin(A);
-    let T2 = T / 2;
-    let x1 = -H * c, x2 = x1 - T * s;
-    let y1 = H * s, y2 = y1 - T * c;
-    let x3 = x2 - (T2 - y2) * c / s;
-    if (x3 < x2 || opt.shape == 2) x3 = x2;
-    if (y2 < T2) y2 = T2;
-    let pts = RArray.convert([0,0], [x1, y1], [x2, y2], [x3, T2], [-L, T2],
-        [-L, -T2], [x3, -T2], [x2, -y2], [x1, -y1]);
-    if (opt.shape || y1 < T2) {
-        pts.splice(8, 1);
-        pts.splice(1, 1);
-    }
-    L /= 2;
-    for (let i=0;i<pts.length;i++) pts[i][0] += L;
-    if (opt.double) {
-        let n = Math.floor(pts.length / 2);
-        let dpts = pts.slice(0, n);
-        let flip = (i) => {
-            let [x, y] = pts[i];
-            return new RArray(-x, y);
-        }
-        for (let i=0;i<n;i++) dpts.push(flip(n - 1 - i));
-        n = dpts.length - 2;
-        flip = (i) => {
-            let [x, y] = dpts[i];
-            return new RArray(x, -y);
-        }
-        for (let i=n;i>0;i--) dpts.push(flip(i));
-        pts = dpts;
-    }
-    return pts;
-}
-
-function star_points(sides, big, small) {
-/* Calculate the vertices of a star */
-    if (!small) small = 3 * big / 7;
-    return [...fn_eval((i) => vec2d(i % 2 ? small : big, 90 * (1 + 2 * i / sides)), range(0, 2 * sides))];
-}
-
-function sq(x) {return x*x}
-function root(x, n) {return Math.pow(x, 1 / (n == null ? 2 : n))}
-function sin(d) {return Math.sin(d*DEG)}
-function cos(d) {return Math.cos(d*DEG)}
-function tan(d) {return Math.tan(d*DEG)}
-function asin(d) {return Math.asin(d)*RAD}
-function acos(d) {return Math.acos(d)*RAD}
-function atan(d) {return Math.atan(d)*RAD}
-function atan2(y,x) {return Math.atan2(y,x)*RAD}
-function hypot(x,y) {return Math.sqrt(x*x+y*y)}
-
-const log = (x, b) => {
-    x = Math.log(x);
-    return b ? x / Math.log(b) : x;
-}
-
-const vec2d = (r, a, rad) => {
-    if (!rad) a *= DEG;
-    return new RArray(r * Math.cos(a), r * Math.sin(a));
-}
-
-const vec = (...xy) => {return new RArray(...xy)}
-
-const adjust_angle = (a, min, max) => {
-    if (min == null) min = 0;
-    if (max == null) max = min + 360;
-    while (a < min) a += 360;
-    while (a >= max) a -= 360;
-    return a;
-}
-
-
-class Segment {
-
-constructor(x1, y1, x2, y2) {
-    if (x2 == null) {
-        x2 = x1;
-        y2 = y1;
-        x1 = y1 = 0;
-    }
-    let dx = x2 - x1;
-    let dy = y2 - y1;
-    let r = Math.sqrt(dx*dx + dy*dy);
-    let u = new RArray(dx / r, dy / r);
-    let a = Math.atan2(dy, dx);
-    let t = this;
-    Object.assign(this, {
-        point1: new RArray(x1, y1),
-        point2: new RArray(x2, y2),
-        length: r, rad: a, deg: a * RAD, slope: u[1] / u[0],
-        midpoint: new RArray(x1 + dx/2, y1 + dy/2),
-        unitVector: u, vector: new RArray(dx, dy),
-        normal: new RArray(-u[1], u[0]),
-        point: (s) => {return new RArray(x1 + u[0] * s, y1 + u[1] * s)}, 
-        params: (x, y) => {
-            let p = (x - x1) * u[0] + (y - y1) * u[1];
-            let q = (x1 - x) * u[1] + (y - y1) * u[0];
-            return new RArray(p, q)
-        },
-        closest: (x, y) => {return t.point((x - x1) * u[0] + (y - y1) * u[1])}
-    });
-}
-
-static point_slope(point, length, slope, middle) {
-    let [dx, dy] = Math.abs(slope) == Infinity ? new RArray(0, slope < 0 ? -length : length) : 
-        new RArray(1, slope).times(length / hypot(1, slope));
-    let [x1, y1] = middle ? new RArray(-dx/2, -dy/2).plus(point) : point;
-    return new Segment(x1, y1, x1+dx, y1+dy);
-}
-
-}
-
-
-function _SSS(a, b, c) {
-    // Calculate angle C from sides a, b, c
-    return acos((c*c - a*a - b*b) / (-2*a*b));
-}
-
-function SSS(a, b, c) {
-    // Calculate angles A, B, C from sides a, b, c
-    return [_SSS(b, c, a), _SSS(a, c, b), _SSS(a, b, c)];
-}
-
-function SAS(a, C, b) {
-    // Calculate angle A, side c, angle B from others
-    let c = root(a*a + b*b - 2*a*b*cos(C));
-    let A = _SSS(b, c, a);
-    return [A, c, 180-(A+C)];
-}
-
-function ASA(A, b, C) {
-    // Calculate side a, angle B, side c from others
-    let B = 180 - (A + C);
-    b /= sin(B);
-    let a = b * sin(A);
-    let c = b * sin(C);
-    return [a, B, c];
-}
-
-function SSA(a, b, A, ambig) {
-    // Calculate side c, angle C, angle B
-    let B = asin(b * sin(A) / a);
-    if (ambig) B = 180 - B;
-    let C = 180 - (A + B);
-    if (C >= 0)
-        return [root(a*a + b*b - 2*a*b*cos(C)), C, B];
-}
-
-function quad_form(a, b, c) {return [(-b + root(b*b-4*a*c))/(2*a), (-b - root(b*b-4*a*c))/(2*a)]}
-
-const transform = (opt, ...pts) => { // 2D transformation
-/* 
-    opt.angle = rotation angle
-    opt.deg = degrees(true) / radians(false)
-    opt.center = center of rotation
-    opt.shift = shift after rotation
-    pts = array of points
-*/
-    let a = opt.angle ? opt.angle : 0;
-    if (opt.deg) a *= DEG;
-    let c = Math.cos(a);
-    let s = Math.sin(a);
-    let xc = 0, yc = 0;
-    if (opt.center) {
-        xc = opt.center[0];
-        yc = opt.center[1];
-    }
-    let dx = xc;
-    let dy = yc;
-    if (opt.shift) {
-        dx += opt.shift[0];
-        dy += opt.shift[1];
-    }
-    let t = [];
-    for (let i=0;i<pts.length;i++) {
-        let x = pts[i][0] - xc;
-        let y = pts[i][1] - yc;
-        t.push(new RArray(x * c - y * s + dx, x * s + y * c + dy));
-    }
-    return t;
-}
-
-function lin_reg_xy(x, y) {
-    let n = x.length;
-    if (y.length != n) throw("Dimension error");
-    x = new RArray(...x);
-    y = new RArray(...y);
-    let sx = x.sum();
-    let sy = y.sum();
-    let m = (n * x.dot(y) - sx * sy) / (n * x.dot(x) - sx * sx);
-    let b = (sy - m * sx) / n;
-    return {m: m, b: b, fn: (x) => m * x + b}
-}
-
-function exp_reg_xy(x, y) {
-    let n = y.length;
-    let ln_y = new Array(n);
-    for (let i=0;i<n;i++) ln_y[i] = Math.log(y[i]);
-    let reg = lin_reg_xy(x, ln_y);
-    let a = Math.exp(reg.b);
-    let k = reg.m;
-    return {a:a, k:k, fn: (x) => a * Math.exp(k * x)}
-}
-
-function pwr_reg_xy(x, y) {
-    let n = x.length;
-    let ln_x = new Array(x);
-    let ln_y = new Array(n);
-    for (let i=0;i<n;i++) {
-        ln_x[i] = Math.log(x[i]);
-        ln_y[i] = Math.log(y[i]);
-    }
-    let reg = lin_reg_xy(ln_x, ln_y);
-    let a = Math.exp(reg.b);
-    n = reg.m;
-    // console.log(a, n);
-    return {a:a, n:n, fn: (x) => a * Math.pow(x, n)}
-}
-
-function lin_reg(...data) {return lin_reg_xy(...unzip(data))}
-function exp_reg(...data) {return exp_reg_xy(...unzip(data))}
-function pwr_reg(...data) {return pwr_reg_xy(...unzip(data))}
-
-function gcf(a, b) {
-    let a1 = parseInt(a);
-    let b1 = parseInt(b);
-    if (a != a1 || b != b1 || isNaN(a1) || isNaN(b1) || a < 1 || b < 1)
-        throw("Invald argument");
-    [a, b] = [Math.min(a1, b1), Math.max(a1, b1)];
-    if (b % a == 0) return a;
-    let g = 1, f = 2;
-    while (2 * f <= a) {
-        if (a % f == 0 && b % f == 0) g = f;
-        f++;
-    }
-    return g;
-}
-
-function lcm(a, b) {
-    return Math.round(a / gcf(a, b) * b);
-}
-
-
-/** svg2.js **/
-
 /**
 Simple JavaScript animations rendered in an <svg> element
 (c) 2023-2025 by D.G. MacCarthy <sc8pr.py@gmail.com>
@@ -763,40 +54,45 @@ css(...rules) {
     return this;
 }
 
-ralign(pos, dim) {
+get bbox_px() {return this.element.getBBox()}
+
+get bbox_cs() {
+    let svg = this.svg;
+    let bbox = this.element.getBBox();
+    let xy0 = new RArray(bbox.x, bbox.y);
+    let xy1 = xy0.plus([bbox.width, bbox.height]);
+    xy0 = svg.p2a(...xy0);
+    xy1 = svg.p2a(...xy1);
+    return {x: xy0[0], y: xy0[1], width: Math.abs(xy1[0] - xy0[0]), height: Math.abs(xy1[1] - xy0[1])};
+}
+
+ralign(posn, dim) {
 /* Align the element based on its bounding box */
+    if (posn == null) {
+        posn = this._aligned_posn;
+        if (posn == null) return this;
+        [posn, dim] = posn;
+    }
     let svg = this.svg;
     let x, y;
     let box = this.element.getBBox();
     let [w, h] = [box.width, box.height];
     if (w * h == 0) console.warn("Aligning group with 0 width or height:", this);
-    [w, h, x, y] = this.rect_xy([w.toFixed(2), h.toFixed(2)], pos);
+    [w, h, x, y] = this.rect_xy([w.toFixed(2), h.toFixed(2)], posn);
     if (dim == "x") y = box.y;
     else if (dim == "y") x = box.x;
     let [dx, dy] = new RArray(x,y).minus([box.x, box.y]);
-    this.shift_by([dx / svg.scale[0], dy / svg.scale[1]]);
+    this.config({_aligned_posn: [posn, dim], shift: [dx / svg.scale[0], dy / svg.scale[1]]});
     return this.update_transform();
 }
 
-align(xy, x, y) {
-/* Align the element based on its bounding box */
-    let box = this.element.getBBox();
-    let [w, h] = [box.width, box.height];
-    if (w * h == 0) console.warn("Aligning group with 0 width or height:", this);
-    if (typeof(xy) == "number") xy = [xy, xy];
-    if (y == null) {
-        if (x == null) x = y = 0.5;
-        else if (typeof(x) == "string")
-            [x, y] = {top: [0.5, 0], bottom: [0.5, 1], left: [0, 0.5], right: [1, 0.5]}[x];
+realign_text(t, n) {
+    clearTimeout(this.realign_text_timeout);
+    if (n == null) n = 10;
+    if (t !== false) for (let g of this.find_all("g")) {
+        if (g._aligned_posn && g.$.find("text").length) console.log(g.ralign());
     }
-    let nx = x == null;
-    let ny = y == null;
-    let dxy = this.svg.p2a(box.x + (nx ? 0 : x) * w, box.y + (ny ? 0 : y) * h).plus(this._shift);
-    dxy = this._cs(xy).minus(dxy);
-    if (nx) dxy[0] = 0;
-    if (ny) dxy[1] = 0;
-    this._shift = this._shift.plus(dxy);
-    return this.update_transform();
+    if (t && n > 1) this.realign_text_timeout = setTimeout(() => this.realign_text(t, n-1), t);
 }
 
 
@@ -832,7 +128,7 @@ shift_by(xy) {
 clip_path(id, clone) {
 /* Clone or move the <g> content to a <clip_path> */
     let e = this.$;
-    let cp = $(document.createElementNS(SVG2.nsURI, "clip_path")).attr({id: id});
+    let cp = $(document.createElementNS(SVG2.nsURI, "clipPath")).attr({id: id});
     cp.appendTo(this.svg.defs[0]);
     if (clone) cp.html(e.html());
     else e.children().appendTo(cp);
@@ -940,10 +236,12 @@ set animated(a) {SVG2.set_animated(this, a)}
 
 /** Create child elements within <svg> or <g> element **/
 
-create_child(tag, attr) {
+create_child(tag, attr, html) {
 /* Create a child element of the <g> element */
     let c = $(document.createElementNS(SVG2.nsURI, tag));
-    return c.attr(attr ? attr : {}).appendTo(this.element);
+    c.attr(attr ? attr : {});
+    if (html) c.html(html);
+    return c.appendTo(this.element);
 }
 
 group(...css) {
@@ -990,7 +288,11 @@ ellipse(r, posn, selector) {
 static _anchor(posn) {
     if (posn == null) posn = [0, 0];
     if (posn.length == 4) return posn;
-    if (posn[0] instanceof Array) return [...posn[0], ...posn[1]];
+    if (posn.length == 3) return [posn[0], posn[1], ...SVG2.parse_anchor(posn[2])];
+    if (posn[0] instanceof Array) {
+        let a = typeof(posn[1]) == "string" ? SVG2.parse_anchor(posn[1]) : posn[1];
+        return [...posn[0], ...a];
+    }
     return [...posn, 0.5, 0.5];
 }
 
@@ -1011,23 +313,11 @@ rect(size, posn, selector) {
     return e.attr({width: f(w), height: f(h), x: f(x), y: f(y)});
 }
 
-async image_promise(href, selector) {
-/* Modify or append an <image> to the <g> element */
-    href = new URL(href, location.href).href;
-    let e = selector ? $($(selector)[0]) : this.create_child("image");
-    return load_img(href).then(img => {
-        let img$ = $(img).appendTo("body");
-        let bbox = {width: img$.width(), height: img$.height()};
-        img$.remove();
-        return [e.attr({href: href, x: 0, y: 0}), bbox];
-    })
-}
-
-_img_size(size, bbox) {
+_img_size(size, wh) {
     if (!size) size = {scale: 1};
     let s = size.scale;
     if (s) {
-        let [w, h] = [bbox.width, bbox.height];
+        let [w, h] = [wh.width, wh.height];
         if (!(w && h)) console.warn("Sizing image with a dimension of 0")
         size = [(s * w).toFixed(2), (s * h).toFixed(2)];
     }
@@ -1036,35 +326,94 @@ _img_size(size, bbox) {
 }
 
 async image(href, size, posn, selector) {
-    return this.image_promise(href, selector).then(e => {
-        let bbox = e[1];
-        e = e[0];
-        size = this._img_size(size, bbox);
+/* Draw a scaled and aligned image */
+    href = new URL(href, location.href).href;
+    let e = selector ? $($(selector)[0]) : this.create_child("image");
+    return load_img(href).then(img => {
+        size = this._img_size(size, {width: img.naturalWidth, height: img.naturalHeight});
         let [w, h, x, y] = this.rect_xy(size, posn);
         let f = (x) => x.toFixed(this.svg.decimals);
-        return e.attr({width: f(w), height: f(h), x: f(x), y: f(y)});
+        return e.attr({href: href, width: f(w), height: f(h), x: f(x), y: f(y)});
     });
 }
 
-async mjax(tex, size, posn, color) {
+static mjax_natural_size(svg) {
+/* Get size of MathJax <svg> based on {scale: 1} equal to 30px font */
+    let s = 14;
+    let w = svg.attr("width");
+    let h = svg.attr("height");
+    if (w.indexOf("ex") == -1 || h.indexOf("ex") == -1) throw("Expecting 'ex' units in MathJax SVG");
+    return {width: s * parseFloat(w), height: s * parseFloat(h)};
+}
+
+async mjax(tex, size, posn, color, theta) {
 /* Asynchronously render LaTeX to <image> with MathJax */
     let g = this.group();
     let img = g.create_child("image");
     if (size == null) size = {scale: 1};
-    if (size.scale) size = {scale: size.scale / 32};
+    tex = tex.replace('↡', "\\scriptsize");
     if (color) tex = `\\color{${color}}{${tex}}`;
     return mjax_svg(tex).then(svg => {
-        svg.appendTo("body");
-        let bbox = svg[0].getBBox();
-        svg.remove();
-        size = this._img_size(size, bbox);
+        size = this._img_size(size, SVG2.mjax_natural_size(svg));
         let [w, h, x, y] = this.rect_xy(size, posn);
         let f = (x) => x.toFixed(this.svg.decimals);
         let url = "data:image/svg+xml;base64," + unicode_to_base64(svg[0].outerHTML);
         img.attr({href: url, width: f(w), height: f(h), x: f(x), y: f(y)});
+        if (theta) {
+            let xy = posn[2] instanceof Array ? posn[1] : [posn[0], posn[1]];
+            g.config({theta: theta, pivot: xy});
+        }
         return g;
     });
 }
+
+ticks(opt) { /*
+    x, y: Specify coordinates of ticks and labels
+    size: Tick extent below and above
+    label: Function or decimal places for labels
+    css: Styling for labels
+    anchor, shift: Adjust location of labels
+    theta: orientation of labels
+*/
+    let p0, p1, gt, gl;
+    let svg = this.svg;
+    let [x, y, size, label] = [opt.x, opt.y, opt.size, opt.label];
+    let swap = y instanceof Array;
+    let g = this.group(swap ? ".TicksY" : ".TicksX");
+    if (swap) [x, y] = [y, x];
+    if (!y) y = 0;
+    let [x0, x1, dx] = x;
+    if (size) {
+        gt = g.group(".Ticks", "black@1");
+        p0 = svg._cs(swap ? [size[0], 0] : [0, size[0]]);
+        p1 = svg._cs(swap ? [size[1], 0] : [0, size[1]]);
+    }
+    if (label != null) {
+        gl = g.group(".Labels");
+        let [css, shift] = [opt.css, opt.shift];
+        if (css) {
+            if (!(css instanceof Array)) css = [css];
+            gl.css(...css);
+        }
+        if (shift) {
+            if (!(shift instanceof Array)) shift = swap ? [shift, 0] : [0, shift];
+            gl.shift_by(shift);
+        }
+    }
+    let f = isNaN(label) ? label : x => x.toFixed(label);
+    let anchor = opt.anchor ? opt.anchor : (swap ? "r" : "t");
+    for (let xi = x0; xi <= x1; xi += dx) {
+        let dp = swap ? [y, xi] : [xi, y];
+        if (size) gt.line(p0.plus(dp), p1.plus(dp));
+        if (label != null) {
+            let text = f(xi);
+            let t = gl.text(text, [...dp, anchor], opt.theta);
+            if (parseFloat(text) == 0) t.$.addClass("Zero");
+        }
+    }
+    return g;
+}
+
 
 plot(points, size, href, theta) {
 /* Plot an array of points as circles, rectangles, or images */
@@ -1090,61 +439,6 @@ plot(points, size, href, theta) {
     return g;
 }
 
-label(fn, x, y) {
-/** Add a <g> containing <text> labels or tick marks as <line>, Usage:
- .label(["-5", "3"], [...range(-15, 31, 5)], 1); // Draw ticks from 5 pixels below x=1 to 3 pixels above
- .label(1, [...range(-15, 31, 5)], 2);           // Label x-axis to 1 decimal place at y=2
- .label(0, 0, [...range(-5, 5, 1)]);             // Label y-axis to 0 decimal places at x=0
- .label(f, 0, [...range(-5, 5, 1)]);             // Label y-axis at x=0 with function f generating text
-**/
-    let g = this.group();
-    let xa = x instanceof Array;
-    let ya = y instanceof Array;
-    let tm, tp;
-    if (fn instanceof Array) {
-        [tm, tp] = fn;
-        [tm, tp] = xa ? [this._cs([0, tm])[1], this._cs([0, tp])[1]] : [this._cs([tm, 0])[0], this._cs([tp, 0])[0]];
-    }
-    else if (typeof(fn) == "number") {
-        let dec = fn;
-        fn = xa ? (x) => x.toFixed(dec) : (x, y) => y.toFixed(dec);
-    }
-    let tick = tm || tp;
-    let n = xa ? x.length : y.length;
-    for (let i=0;i<n;i++) {
-        let x0 = xa ? x[i] : x;
-        let y0 = ya ? y[i] : y;
-        let [xc, yc] = this._cs([x0, y0]);
-        if (tick) {
-            if (!ya) g.line([xc, yc + tm], [xc, yc + tp]);
-            else if (!xa) g.line([xc + tm, yc], [xc + tp, yc]);
-        }
-        else {
-            let txt = g.text(fn(x0, y0, i), [xc, yc]);
-            if (parseFloat(txt.html()) == 0) txt.addClass("Zero");
-            // let txt = g.gtext(fn(x0, y0, i), [], [xc, yc]);
-            // if (parseFloat(txt.$.children("text").html()) == 0) txt.addClass("Zero");
-        }
-    }
-    if (tick) g.css("black@1").$.addClass(`Ticks Tick${ya ? 'Y' : 'X'}`);
-    else {
-        g.css("text", 15).$.addClass(`Labels Label${ya ? 'Y' : 'X'}`);
-        if (ya) g.css({"text-anchor": "end"});
-    }
-    return g;
-}
-
-tick_label(fn, x, y, tick, offset) {
-/* Draw and label tick marks along axis */
-    let t = ["number", "string"].indexOf(typeof(tick)) >= 0;
-    let xa = x instanceof Array;
-    if (tick) this.label(t ? [0, tick] : tick, x, y);
-    if (offset == null) offset = 0;
-    if (xa) this.label(fn, x, offset);
-    else this.label(fn, offset, y);
-    return this;
-}
-
 poly(points, closed) {
 /* Modify or append a <polygon> or <polyline> to the <g> element */
     let attr = {points: this.svg.pts_str(points)};
@@ -1160,6 +454,8 @@ star(n, far, near) {
     return this.poly(pts, 1);
 }
 
+text(text, posn, theta, css) {return new SVG2text(this, text, posn, theta, css)}
+gtext(text, css, posn, theta) {return new SVG2text(this, text, posn, theta, css)}
 arrow(pts, options, anchor) {return new SVG2arrow(this, pts, options, anchor)}
 locus(eq, param, args) {return new SVG2locus(this, eq, param, args)}
 path(start) {return new SVG2path(this, start)}
@@ -1190,8 +486,7 @@ chevron(xy, dir, size) {
 
 ray(p1, p2, size, ...pos) {
 /* Draw a directed segment */
-    let g = this.group();
-    g.$.addClass("Ray");
+    let g = this.group(".Ray");
     g.line(p1, p2);
     let seg = g.seg = new Segment(...p1, ...p2);
     let svg = this.svg;
@@ -1230,106 +525,6 @@ _grid(g, x, y, swap) {
         }
     }
 }
-
-text(data, xy, selector) {
-/* Add a <text> element to the group */
-    let svg = this.svg;
-    let e = selector ? $($(selector)[0]) : this.create_child("text");
-    let f = (x) => x.toFixed(svg.decimals);
-    let [x, y] = svg.a2p(...this._cs(xy));
-    return e.attr({x: f(x), y: f(y)}).html(data);
-}
-
-gtext(data, css, posn) {
-/* Create a <g> element with an aligned <text> child */
-    if (!(css instanceof Array)) css = [css];
-    let g = this.group(...css);
-    g.text(data);
-    return g.ralign(posn);
-}
-
-// symbol(...args) { // Deprecated!
-//     let g = this.group(".Symbol");
-//     for (let [s, f, xy, opt] of args) {
-//         let txt = g.text(s, xy);
-//         if (f & 4) txt.addClass("Small");
-//         if (f & 2) txt.css(SVG2._style.ital);
-//         if (f & 1) txt.css(SVG2._style.bold);
-//         if (opt) {
-//             if (opt.size) txt.css({"font-size": `${opt.size}px`});
-//         }
-//     }
-//     return g;
-// }
-
-symb(...args) { // Deprecated!!
-/* Render a symbol from a list of text elements */
-//  BOLD = 1, ITAL = 2, SMALL = 4
-    let g = this.group(".Symbol");
-    let szStr = (s) => typeof(s) == "number" ? `${size}px` : s;
-    // if (size) g.css("symbol", {"font-size": szStr(size)});
-    for (let [s, opt, pos] of args) {
-        let f = 0;
-        if (typeof(opt) == "number") [f, opt] = [opt, null];
-        let txt = g.text(s, pos);
-        if (f & 4) txt.css({"font-size": "60%"});
-        if (f & 1) txt.css(SVG2._style.bold);
-        if (f & 2) txt.css(SVG2._style.ital);
-        if (opt) {
-            if (opt.size) txt.css({"font-size": szStr(opt.size)});
-            if (opt.css) txt.css(opt.css);
-        }
-    }
-    return g;
-}
-
-ctext(...args) {
-/* Render multiple aligned <g> elements with <text> child nodes */
-    let gs = [];
-    for (let [t, posn, options] of args) {
-        if (options == null) options = {};
-        if (typeof(options) == "string") options = {css: options};
-        let g = this.gtext(t, options.css ? options.css : [], posn);
-        if (options.config) g.config(options.config);
-        gs.push(g);
-    }
-    return gs;
-}
-
-// multiline(text, space) {
-// /* Render multiple lines of text */
-//     if (!space) space = "20";
-// 	let g = this.group();
-// 	let y = 0;
-// 	if (typeof(space) == "string") space = parseFloat(space) / Math.abs(this.svg.scale[1]);
-// 	for (let t of text.split("\n")) {
-// 		g.text(t, [0, y]);
-// 		y -= space;
-// 	}
-// 	return g;
-// }
-
-// flow(text, shape, options) {
-// /* Render a flow chart element */
-// 	let g = this.group();
-// 	if (shape == "d") {
-// 		let [sx, sy] = this.svg.scale;
-// 		let w = this._cs([options.width, 0])[0] / Math.sqrt(2);
-// 		g.group().config({theta: 45}).rect([w, w * Math.abs(sx/sy)]);
-// 	}
-// 	else {
-// 		let wh = new RArray(...this._cs(options.size));
-// 		if (shape == "r") g.rect(wh);
-// 		else if (shape == "e") g.ellipse(wh.times(0.5));
-// 		else if (shape == "p") {
-// 			let [x, y] = wh.times(0.5);
-// 			let d = (options.slant ? options.slant : 0.15) * x;
-// 			g.poly([[d-x, y], [x+d, y], [x-d, -y], [-x-d, -y]], 1);
-// 		}
-// 	}
-// 	g.multiline(text, options.space).align([0, 0]);
-// 	return g;
-// }
 
 ruler(n, tick, opt) { //width, big, offset, tickSmall, tickBig) {
 /* Draw a ruler */
@@ -1401,68 +596,6 @@ edot(n, r) {
     return g;
 }
 
-graph(options) {
-/* Add common scatter plot / line graph elements */
-    let svg = this.svg;
-    let x = options.x, y = options.y;
-    if (options.grid) {
-        let [dx, dy] = options.grid;
-        let [l, r, b, t] = svg.lrbt;
-        l = dx * Math.round(l / dx);
-        r = dx * Math.round(r / dx);
-        b = dy * Math.round(b / dy);
-        t = dy * Math.round(t / dy);
-        this.grid([l, r, dx], [b, t, dy], options.appendAxes);
-    }
-
-    if (x || y) {
-        let txt = this.group(".AxisTitle", "text");
-        let xy = (i) => {
-            let pos = (i ? y : x).title[1];
-            if (!(pos instanceof Array)) pos = i ? [pos, svg.center[1]] : [svg.center[0], pos];
-            return pos;
-        }
-        if (x) {
-            let dy = [0, x.y ? x.y : 0];
-            if (x.tick) {
-                this.tick_label(x.dec ? x.dec : 0, [...range(...x.tick)], 0, x.tickSize ? x.tickSize : "-6");
-                this.find("g.LabelX").config({shift: x.shift}).shift_by(dy);
-                this.find("g.TickX").shift_by(dy);
-            }
-            if (x.title) txt.group().shift_by(dy).text(x.title[0], xy(0));
-        }
-        if (y) {
-            let dx = [y.x ? y.x : 0, 0];
-            if (y.tick) {
-                this.tick_label(y.dec ? y.dec : 0, 0, [...range(...y.tick)], y.tickSize ? y.tickSize : "-6");
-                this.find("g.LabelY").config({shift: y.shift}).shift_by(dx);
-                this.find("g.TickY").shift_by(dx);
-            }
-            if (y.title) txt.group().config({theta: 90, shift: xy(1)}).shift_by(dx).text(y.title[0]);  
-        }  
-    }
-
-    let data = options.data;
-    if (data) {
-        let g = this.group(".Series"), s = [];
-        for (let series of data) {
-            if (series.plot) s.push(g.plot(...series.plot));
-            else {
-                let gs = g.group(".Locus", "#0065fe@2", "none");
-                s.push(gs);
-                if (series.connect) {
-                    let pts = series.connect;
-                    if (!(pts instanceof Array)) pts = zip(pts.x, pts.y);
-                    gs.poly(pts);
-                }
-                else if (series.locus) gs.locus(...series.locus);
-            }
-        }
-        this.series = s;
-    }
-    return this;
-}
-
 error_bar_y(x, y0, y1, dx, _swap) {
     /* Draw x or y error bars */
     dx = this._cs_size(dx);
@@ -1515,14 +648,14 @@ tip_to_tail(vecs, options) {
 energy_flow(data) {
 /* Draw an energy flow diagram */
     SVG2.style(this.circle(data.radius), "none", "#0065fe@3");
-    let g = this.group("text", 24);
+    let g = this.group("sans", 24);
     let getTeX = (t) => t.charAt(0) == '$' ? t.substring(1) : (SVG2.eq[t] ? SVG2.eq[t] : null);
     for (let item of data.labels) {
         let [txt, pos, color, shift] = item;
         let tex = getTeX(txt);
         if (tex && txt.charAt(0) != "$") console.log(txt, tex);
         if (!color) color = "#0065fe";
-        if (tex) this.mjax(tex, {scale: 1}, pos, color);
+        if (tex) this.mjax(tex, null, pos, color);
         else g.gtext(txt, color, pos);
     }
     g = this.group("arrow");
@@ -1608,6 +741,31 @@ coord_from_parent(xy) {
 
 }
 
+class SVG2text extends SVG2g {
+
+constructor(g, text, posn, theta, css) {
+    super(g);
+    let xy = posn == null ? [0, 0] : [posn[0], posn[1]];
+    this.config({shift: xy, theta: theta});
+    if (css instanceof Array) this.css(...css);
+    else if (css) this.css(css);
+    let svg = this.svg;
+    let e = this._text$ = this.create_child("text");
+    let anchor = SVG2.parse_anchor(posn && posn.length > 2 ? posn[2] : "", 1);
+    e.html(text).css(anchor);
+    let [x, y] = svg.a2p(0, 0);
+    let f = (x) => x.toFixed(svg.decimals);
+    e.attr({x: f(x), y: f(y)});
+    return;
+}
+
+get text() {return this._text$.html()}
+set text(t) {this._text$.html(t)}
+
+}
+
+// SVG2text._make_map();
+
 
 class SVG2arrow extends SVG2g {
 
@@ -1658,7 +816,7 @@ reshape(info, options, anchor) {
 
 label(text, shift) {
 /* Add text relative to arrow midpoint */
-    return this.gtext(text, ["text", "none@"], this.seg.midpoint.plus(this._cs(shift)));
+    return this.gtext(text, ["sans", "none@"], this.seg.midpoint.plus(this._cs(shift)));
 }
 
 }
@@ -1888,7 +1046,32 @@ constructor(selector, options) {
 
 static async sleep(t) {await new Promise(r => setTimeout(r, t))}
 
-static arr(dy) {return ["→", 5, [0, dy == null ? "20" : dy]]}
+static parse_anchor(s, obj) {
+    let x = 0;
+    [x, s] = SVG2._parse_anchor(s);
+    if (s.length) x += SVG2._parse_anchor(s)[0];
+    let [h, v] = [x & 3, (x & 12) / 4];
+    if (obj) {
+        let obj = {};
+        obj["text-anchor"] = ["middle", "start", "end"][h];
+        obj["dominant-baseline"] = ["middle", "auto", "hanging"][v];
+        return obj;
+    }
+    return [h == 1 ? 0 : (h == 2 ? 1 : 0.5), v == 1 ? 1 : (v == 2 ? 0 : 0.5)];
+}
+
+static _parse_anchor(s) {
+    let a = ["left", "right", "bottom", "top"];
+    let v = 1;
+    s = s.trim().toLowerCase();
+    for (let i=0;i<a.length;i++) {
+        let ai = a[i];
+        if (s.substring(0, ai.length) == ai) return [v, s.substring(ai.length)];
+        if (s.charAt(0) == ai.charAt(0)) return [v, s.substring(1)];
+        v *= 2;
+    }
+    return [0, s];
+}
 
 get size() {
     let e = this.$;
@@ -2291,7 +1474,7 @@ static ebg(sel, Emax, step, data, options) {
     options = Object.assign({size: [512, 384], width: 0.5, duration: 0, unit: "J", margin: [32, 4, 44, 16]}, options);
     let n = data.length;
     let svg = new SVG2(sel, {size: options.size, lrbt: [0, n, 0, Emax], margin: options.margin});
-    svg.grid([0, n], [0, Emax, step]).grid([0, 1, 2], [0, Emax]);
+    svg.grid([0, n], [0, Emax + step / 2, step]).grid([0, 1, 2], [0, Emax]);
 
     let bars = [];
     let sym = svg.group(".MJax");
@@ -2301,20 +1484,17 @@ static ebg(sel, Emax, step, data, options) {
         bars.push(svg.rect([options.width, 1], [i + 0.5, 1]).css({fill: c}));
         let tex = d[0];
         if (SVG2.eq[tex]) tex = SVG2.eq[tex];
-        sym.mjax(tex, {scale: 1}, [[i + 0.5, "-8"], [0.5, 0]], c);
+        sym.mjax(tex, null, [[i + 0.5, "-8"], [0.5, 0]], c);
     }
     svg.config({data: data, options: options});
     svg.$.find("g.Grid line.Axis").appendTo(svg.$);
 
-    if (options.E) svg.line([0, options.E], [n, options.E]).addClass("TotalEnergy").css({stroke: "black", "stroke-width": "2px"});
+    if (options.E) css(svg.line([0, options.E], [n, options.E]), ".TotalEnergy", "black@2");
     if (options.label) {
+        let css = ["sans", 16];
         let [dec, x, skip] = options.label;
-        let g = svg.label(dec, x, [...range(0, Emax + step, skip ? skip * step : step)]);
-        let dy = options.yShift;
-        g.shift_by([0, dy != null ? dy : "-6"]);
-        if (options.unit) g.text(options.unit, ["6", Emax]).css({"text-anchor" : "start"});
-        g.$.find(".Zero").removeClass("Zero");
-        g.$.find("text").css({"font-size": "16px"});
+        svg.ticks({x: x, y: [0, Emax + step/2, skip ? skip * step : step], label: dec, css: css});
+        if (options.unit) svg.gtext(options.unit, css, ["6", Emax, "l"]);
     }
 
     svg.beforeupdate = function() {
@@ -2396,37 +1576,28 @@ static style(e, ...rules) {
     return e;
 };
 
-
 }
 
 
 SVG2.nsURI = "http://www.w3.org/2000/svg";
 SVG2._cache = {};
 SVG2.load.pending = [];
-
-SVG2.url = location.origin;
-if (SVG2.url.substring(0, 16) != "http://localhost") SVG2.url += "/sci/";
-
+SVG2.url = location.href.split("#")[0];
 SVG2.sans = "'Noto Sans', 'Open Sans', 'Droid Sans', Oxygen, sans-serif";
-SVG2.mono = "Inconsolata, 'Droid Sans Mono', monospace";
+SVG2.mono = "'Noto Sans Mono', Inconsolata, 'Droid Sans Mono', monospace";
 SVG2.symbol = SVG2.serif = "'Noto Serif', 'Open Serif', 'Droid Serif', serif";
-// SVG2.symbol = "KaTeX_Main, 'Latin Modern Roman', 'Droid Serif', 'Noto Serif', serif";
 
 SVG2._style = {
     grid: {stroke: "lightgrey", "stroke-width": "0.5px"},
-    text: {"font-family": SVG2.sans, "font-size": "18px", "text-anchor": "middle"},
-    start: {"text-anchor": "start"},
-    middle: {"text-anchor": "middle"},
-    end: {"text-anchor": "end"},
-    symbol: {"font-family": SVG2.symbol, "font-size": "18px", "text-anchor": "middle"},
     arrow: {fill: "red", stroke: "black", "stroke-width": "0.5px", "fill-opacity": 0.8},
     ital: {"font-style": "italic"},
     bold: {"font-weight": "bold"},
-    nostroke: {stroke: "none"},
-    nofill: {fill: "none"},
-    sans: {"font-family": SVG2.sans},
-    serif: {"font-family": SVG2.serif},
-    mono: {"font-family": SVG2.mono},
+    sans: {"font-family": SVG2.sans, "font-size": "18px"},
+    serif: {"font-family": SVG2.serif, "font-size": "18px"},
+    mono: {"font-family": SVG2.mono, "font-size": "18px"},
+
+    // Deprecated!
+    // text: {"font-family": SVG2.sans, "font-size": "18px", "text-anchor": "middle"},
 };
 
 SVG2.eq = {Ek: "E_k", Eg: "E_g"}

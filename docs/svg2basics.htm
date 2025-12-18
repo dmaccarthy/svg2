@@ -1,9 +1,9 @@
 <section class="Post NoPrintIcon" data-icon="svg">   
 <h2 class="Collapse">Creating an <code>SVG2</code> Drawing</h2><div class="Collapse">
 
-<p>Download the <a href="dist/svg2-0.1.0-dev0-min.js" download="svg2-0.1.0-dev0-min.js">SVG2 distribution</a> into your project folder and include it and <code>jquery</code> in your HTML5 document.</p>
+<p>Download the <a href="dist/svg2-0.1.0-dev1-min.js" download="svg2-0.1.0-dev1-min.js">SVG2 distribution</a> into your project folder and include it and <code>jquery</code> in your HTML5 document.</p>
 <pre class="Code" data-echo="html">&lt;script type="text/javascript" src="https://code.jquery.com/jquery-3.7.1.min.js"&gt;&lt;/script&gt;
-&lt;script type="text/javascript" src="svg2-0.1.0-dev0-min.js"&gt;&lt;/script&gt;</pre>
+&lt;script type="text/javascript" src="svg2-0.1.0-dev1-min.js"&gt;&lt;/script&gt;</pre>
 
 <p>Create an <code>&lt;svg&gt;</code> tag somewhere in the body of your document:</p>
 <pre class="Code" data-echo="html">&lt;p&gt;&lt;svg id="Drawing1"&gt;&lt;/svg&gt;&lt;/p&gt;</pre>
@@ -102,7 +102,19 @@ SVG2.style(svg.rect([2, "20"], [-3, -2]), "none", "red@4");
 SVG2.style(svg.poly([[0, 0], [-2, 4], [1, 3]]), "none", "limegreen@1");</pre>
 
 <p>The first argument is the <code>jquery</code> collection to be styled. The remaining arguments are style descriptors. The function interprets a string containing the <code>@</code> symbol as a <code>stroke</code> and <code>stroke-width</code> value; <code>"red@4"</code> is short for <code>{"stroke": "red", "stroke-width": "4px"}</code>. If the string begins or ends with <code>@</code>, it will set only the <code>stroke</code> (e.g. <code>none@</code>) or only the <code>stroke-width</code> (e.g. <code>@2</code>)</p>
-<p>Strings that do not contain the <code>@</code> symbol are taken as <code>fill</code> values.</p>
+<p>Strings that do not contain the <code>@</code> symbol are taken as <code>fill</code> values if they can be interpreted as colors.</p>
+<p>There are several additional strings that represent style data as follows:</p>
+
+<pre class="Code">"grid" = {"stroke": "lightgrey", "stroke-width": "0.5px"}
+"arrow" = {"fill": "red", "stroke": "black", "stroke-width": "0.5px", "fill-opacity": 0.8}
+"ital" = {"font-style": "italic"}
+"bold" = {"font-weight": "bold"}
+"sans" = {"font-family": SVG2.sans}
+"serif" = {"font-family": SVG2.serif}
+"mono" = {"font-family": SVG2.mono}</pre>
+
+<p>You can customize the default font families by assigning new values to <code>SVG2.sans</code>, <code>SVG2.serif</code>, and <code>SVG2.mono</code> if you want to. (Adding text to your drawings is covered in the <a data-feed="svg2img">next tutorial</a>.)</p>
+
 <p>The <code>SVG2.style</code> function returns the <code>jquery</code> collection that was passed as the first argument.</p>
 
 </div></section>
@@ -111,17 +123,22 @@ SVG2.style(svg.poly([[0, 0], [-2, 4], [1, 3]]), "none", "limegreen@1");</pre>
 <h2 class="Collapse">Anchoring</h2><div class="Collapse">
 <p>Many elements — including circles, rectangles, and images — are positioned by their centres by default. As the example below shows, you can change the anchor point of the shape by adding additional information to the position argument.</p>
 <pre class="Code" data-echo="js">SVG2.style(svg.rect([4, 2], [0, 0]), "red@3", "none");
+SVG2.style(svg.rect([4, 2], [0, 0, <span class="Blue">"bottomright"</span>]), "orange@3", "none");
 SVG2.style(svg.rect([4, 2], [[0, 0], <span class="Blue">[1, 0.25]</span>]), "limegreen@3", "none");
 SVG2.style(svg.rect([4, 2], [0, 0, <span class="Blue">0, 0</span>]), "#0065fe@3", "none");
 </pre>
 <p class="Center"><svg id="Drawing6"></svg></p>
-<p>All three of these rectangles have sizes of <code>[4, 2]</code> and positions of <code>[0, 0]</code>. The red rectangle is drawn with its centre at <code>[0, 0]</code> as is the default.</p>
-<p>The other two rectangles have additional anchoring information as highlighted in blue.</p>
-<p>For the green rectangle, the position argument is an array of two ordered pairs: <code>[[0, 0], [1, 0.25]]</code>. The first ordered pair is the position, <code>[0, 0]</code>, and the second describes the anchor point, <code>[1, 0.25]</code>.</p>
+<p>All four rectangles have sizes of <code>[4, 2]</code> and positions of <code>[0, 0]</code>. The red rectangle is drawn with its centre at <code>[0, 0]</code> as is the default.</p>
+<p>The other rectangles have additional anchoring information as highlighted in blue.</p>
+<p>For the orange rectangle, a third item is added to the position array, a string <code>"bottomright"</code>. This indicates that the rectangle is to be drawn with its bottom right corner at the origin. you can use any combination of <code>left</code> or <code>right</code> and <code>top</code> or <code>bottom</code>. If you specify an anchor in only one dimension, the other defaults to centred. For example, <code>"left"</code> would cause the midpoint of the left side to be used as the anchor point.</p>
+<p>You can also use just the first letter; <code>"br"</code> and <code>"rb"</code> are both accepted as abbreviations of <code>"bottomright"</code>.</p>
+
+<p>For the green rectangle, the position argument is an array of two ordered pairs: <code>[[0, 0], [1, 0.25]]</code>. The first ordered pair is the position, <code>[0, 0]</code>, and the second describes a specific anchor point <code>[1, 0.25]</code>.</p>
 <p class="Center"><svg id="Drawing7"></svg></p>
 <p>The anchor point is described relative to the width and height of the rectangle, starting from the top left. An anchor of <code>[1, 0.25]</code> means a point on the right side of the rectangle, one-quarter of the way down. <code>SVG2</code> will draw the rectangle so that this point is at the specified position.</p>
 <p>For the blue rectangle, the position argument is given as a single 4-array, <code>[0, 0, 0, 0]</code>, rather than as two ordered pairs. <code>SVG2</code> will take the first two values as the position and the next two as the anchor. Thus the blue rectangle is drawn so that its top left corner is at the origin.</p>
 <p class="Center"><svg id="Drawing8"></svg></p>
+
 </div></section>
 
 <section class="Post NoPrintIcon" data-icon="svg">   
@@ -194,8 +211,9 @@ loadFeed.draw7 = () => {
 }
 
 loadFeed.draw6 = () => {
-    let svg = new SVG2("#Drawing6", {lrbt: [-5, 5, -3, 2], scale: 32, margin: 2, grid: 1});
+    let svg = new SVG2("#Drawing6", {lrbt: [-5, 5, -3, 3], scale: 32, margin: 2, grid: 1});
     css(svg.rect([4, 2], [0, 0]), "red@3", "none");
+    css(svg.rect([4, 2], [0, 0, "bottomright"]), "orange@3", "none");
     css(svg.rect([4, 2], [[0, 0], [1, 0.25]]), "limegreen@3", "none");
     css(svg.rect([4, 2], [0, 0, 0, 0]), "#0065fe@3", "none");
 }
