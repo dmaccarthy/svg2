@@ -49,7 +49,7 @@ window.MathJax = {
 <p>The <code>mjax</code> method takes up to four arguments, with only the first one required:</p>
 <ul>
     <li><code>tex</code>: The equation markup to be passed to MathJax. Remember to escape the backslash character!</li>
-    <li><code>size</code>: This is the same as for the <code>image</code> method described above, except that if a scale obect is used, a scale of 1 corresponds to a font-size of about 30 pixels (depending on the font).</li>
+    <li><code>size</code>: This is the same as for the <code>image</code> method described above, except that if a scale object is used, a scale of 1 corresponds to a font-size of about 30 pixels (depending on the font).</li>
     <li><code>posn</code>: Position and optional anchoring data as described in <a data-feed="svg2basic">Tutorial 1</a>.</li>
     <li><code>color</code>: A default color for the rendering.</li>
 </ul>
@@ -59,7 +59,7 @@ window.MathJax = {
 
 <section class="Post NoPrintIcon" data-icon="svg">   
 <h2 class="Collapse">Text</h2><div class="Collapse">
-<p>The <code>text</code> method creates a new group that contains a <code>&lt;text&gt;</code> element.</p>
+<p>The <code>text</code> method creates a new group that contains a child <code>&lt;text&gt;</code> element.</p>
 <pre class="Code" data-echo="js">svg.text("SVG2!", [0, 2], 0, ["mono", 48, "none", "#0065fe@1"]);
 svg.text("Hello, world!", [0, 1, "bottom"], 45, ["sans", 24, "red"]);
 </pre>
@@ -68,8 +68,11 @@ svg.text("Hello, world!", [0, 1, "bottom"], 45, ["sans", 24, "red"]);
 <p>The <code>text</code> method takes up to four arguments, with only the first one required:</p>
 <ul>
     <li><code>text</code>: Plain text or HTML to be added to the <code>&lt;text&gt;</code> element.</li>
-    <li><code>posn</code>: Position and optional anchoring data as described in <a data-feed="svg2basics">Tutorial 1</a>. Note that for text, only the string anchors (e.g. <code>"bottomleft"</code>) are accepted. Array anchors (e.g. <code>[0.5, 1]</code>) are not supported because the width and height of the text are not known until the browser has finished rendering the text.</li>
-    <li><code>theta</code>: An angle to rotate the text.</li>
+    <li><code>posn</code>: Position and optional anchoring data as described in <a data-feed="svg2basics">Tutorial 1</a>. Note that for text, only the string anchors (e.g. <code>"bottomleft"</code>) are accepted. Array anchors (e.g. <code>[0.5, 1]</code>) are not supported because the width and height of the text are not known until the browser has finished rendering the text. Anchoring of text is done by setting the containing <code>&lt;g&gt;</code> element’s <code>text-anchor</code> and <code>dominant-baseline</code> styles. You can set the anchor data to <code>false</code> to omit setting these styles, in which case the alignment will be determined by the inherited values or defaults:</li>
+</ul>
+<pre class="Code" data-echo="js">svg.text("Hello, world!", [0, 1, <span class="Blue">false</span>], 45, ["sans", 24, "red"])</pre>
+<ul>
+    <li><code>theta</code>: An angle to rotate the text; the anchor point will be used as the centre of rotation (pivot).</li>
     <li><code>css</code>: Style data to be applied to the <code>&lt;g&gt;</code> element (and inherited by the <code>&lt;text&gt;</code> element).</li>
 </ul>
 

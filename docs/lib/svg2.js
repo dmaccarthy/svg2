@@ -4,12 +4,12 @@ Simple JavaScript animations rendered in an <svg> element
 **/
 
 
-class SVG2g {
+class SVG2group {
 
 constructor(parent, g) {
     if (parent) {
         this.element = g ? $(g)[0] : document.createElementNS(SVG2.nsURI, "g");
-        this.element.graphic = this;
+        this.element._gr = this;
         this.$ = $(this.element);
         this.$.appendTo(g ? g.$ : parent.$);
         this.svg = parent.svg;
@@ -24,16 +24,70 @@ constructor(parent, g) {
     }
 }
 
-find(sel, n) {
-    let e = this.$.find(sel)[n ? n : 0];
-    return e ? e.graphic : null;
+
+/*** Grouping ***/
+
+group(...css) {
+    let g = new SVG2group(this.svg, this.create_child("g"));
+    if (css) g.css(...css);
+    return g;
+}
+
+scaled(s) {return new SVG2scaled(this.svg, this.create_child("g"), s)}
+
+get parent() {
+    let p = this.$.parent().closest("g, svg");
+    return p.length ? p[0]._gr : null;
+}
+
+gpath() {
+/* Return a path array from the <svg> element to the current <g> */
+    let p = this.parent;
+    let a = [this];
+    return p ? p.gpath().concat(a) : a;
+}
+
+
+/*** Searchimg items ***/
+
+get key() {return this._key}
+
+set key(k) {
+    let svg = this.svg;
+    if (k) {
+        if (svg._key_map[k]) throw(`Key '${k}' already exists`);
+        svg._key_map[k] = this;
+    }
+    else delete this._key;
+}
+
+find(k, n) {
+    if (k instanceof $) k = k[0];
+    if (k instanceof SVGElement) return k._gr;
+    let g = this.svg._key_map[k];
+    if (!g) {
+        g = this.$.find(k)[n ? n : 0];
+        g = g ? g._gr : null;
+    }
+    return g;
 }
 
 find_all(selector) {
     let g = [];
     for (let e of this.$.find(selector))
-        if (e.graphic instanceof SVG2g) g.push(e.graphic);
+        if (e._gr instanceof SVG2group) g.push(e._gr);
     return g;
+}
+
+
+/*** Modifying properties ***/
+
+create_child(tag, attr, html) {
+/* Create a child element of the <g> element */
+    let c = $(document.createElementNS(SVG2.nsURI, tag));
+    c.attr(attr ? attr : {});
+    if (html) c.html(html);
+    return c.appendTo(this.element);
 }
 
 config(attr) {
@@ -54,109 +108,49 @@ css(...rules) {
     return this;
 }
 
-get bbox_px() {return this.element.getBBox()}
-
-get bbox_cs() {
+update_transform() {
+/* Calculate and set the transform attribute */
     let svg = this.svg;
-    let bbox = this.element.getBBox();
-    let xy0 = new RArray(bbox.x, bbox.y);
-    let xy1 = xy0.plus([bbox.width, bbox.height]);
-    xy0 = svg.p2a(...xy0);
-    xy1 = svg.p2a(...xy1);
-    return {x: xy0[0], y: xy0[1], width: Math.abs(xy1[0] - xy0[0]), height: Math.abs(xy1[1] - xy0[1])};
-}
-
-ralign(posn, dim) {
-/* Align the element based on its bounding box */
-    if (posn == null) {
-        posn = this._aligned_posn;
-        if (posn == null) return this;
-        [posn, dim] = posn;
+    let a = this.theta * svg.angleDir;
+    let [x, y] = svg.scale.times(this.shift);
+    let f = (x) => x.toFixed(svg.decimals);
+    let t = x || y ? `translate(${f(x)} ${f(y)})` : "";
+    if (a) {
+        let [px, py] = svg.a2p(...this.pivot);
+        t += ` rotate(${f(a)} ${f(px)} ${f(py)})`;
     }
-    let svg = this.svg;
-    let x, y;
-    let box = this.element.getBBox();
-    let [w, h] = [box.width, box.height];
-    if (w * h == 0) console.warn("Aligning group with 0 width or height:", this);
-    [w, h, x, y] = this.rect_xy([w.toFixed(2), h.toFixed(2)], posn);
-    if (dim == "x") y = box.y;
-    else if (dim == "y") x = box.x;
-    let [dx, dy] = new RArray(x,y).minus([box.x, box.y]);
-    this.config({_aligned_posn: [posn, dim], shift: [dx / svg.scale[0], dy / svg.scale[1]]});
-    return this.update_transform();
-}
-
-realign_text(t, n) {
-    clearTimeout(this.realign_text_timeout);
-    if (n == null) n = 10;
-    if (t !== false) for (let g of this.find_all("g")) {
-        if (g._aligned_posn && g.$.find("text").length) console.log(g.ralign());
-    }
-    if (t && n > 1) this.realign_text_timeout = setTimeout(() => this.realign_text(t, n-1), t);
-}
-
-
-/** Kinematics getters and setters **/
-
-get pivot() {return this._pivot};
-get shift() {return this._shift};
-get vel() {return this._vel}
-get acc() {return this._acc}
-get theta() {return this._theta}
-
-set pivot(xy) {this._pivot = new RArray(...this._cs(xy))}
-set shift(xy) {this._shift = new RArray(...this._cs(xy))}
-set vel(xy) {this._vel = new RArray(...this._cs(xy))}
-set acc(xy) {this._acc = new RArray(...this._cs(xy))}
-
-set theta(a) {
-    if (this.thetaMode) {
-        while (a >= 360) a -= 360;
-        while (a < 0) a += 360;
-    }
-    this._theta = a;
-}
-
-shift_by(xy) {
-    this._shift = this._shift.plus(this._cs(xy));
-    return this.update_transform();
-}
-
-
-/** Clipping **/
-
-clip_path(id, clone) {
-/* Clone or move the <g> content to a <clip_path> */
-    let e = this.$;
-    let cp = $(document.createElementNS(SVG2.nsURI, "clipPath")).attr({id: id});
-    cp.appendTo(this.svg.defs[0]);
-    if (clone) cp.html(e.html());
-    else e.children().appendTo(cp);
-    let tr = e.attr("transform");
-    if (tr) cp.children().attr({"transform": tr});
-    return cp;
-}
-
-clip(id) {
-/* Set the clip-path attribute */
-    this.$.attr({"clip-path": `url(#${id})`});
+    t = t.trim();
+    if (t.length) this.$.attr("transform", t);
+    else this.$.removeAttr("transform");
     return this;
 }
 
 
-/** Coordinate transformations **/
+/*** Coordinates and metrics ***/
 
-get parent() {
-    let p = this.$.parent().closest("g, svg");
-    return p.length ? p[0].graphic : null;
+cs_radius(r) {return typeof(r) == "string" ? parseFloat(r) / this.svg.unit : r}
+px_radius(r) {return typeof(r) == "string" ? parseFloat(r) : r * this.svg.unit}
+
+px_size(sz) {
+/* Convert [w, h] to pixel units */
+    if (sz == null) sz = [0, 0];
+    let [w, h] = sz;
+    let [sx, sy] = this.svg.scale;
+    w = typeof(w) == "string" ? parseFloat(w) : Math.abs(w * sx);
+    h = typeof(h) == "string" ? parseFloat(h) : Math.abs(h * sy);
+    return new RArray(w, h);
 }
 
-gpath() {
-/* Return a path array from the <svg> element to the current <g> */
-    let p = this.parent;
-    let a = [this];
-    return p ? p.gpath().concat(a) : a;
+cs_size(sz) {
+/* Convert [w, h] to coordinate system units */
+    if (sz == null) sz = [0, 0];
+    let [w, h] = sz;
+    let [sx, sy] = this.svg.scale;
+    if (typeof(w) == "string") w = parseFloat(w) / Math.abs(sx);
+    if (typeof(h) == "string") h = parseFloat(h) / Math.abs(sy);
+    return new RArray(w, h);
 }
+
 
 coord_from_parent(xy) {
 /* Apply rotation and shift to convert parent <g> coordinates xy relative to child */
@@ -190,24 +184,103 @@ coord_from_svg(xy) {
     return xy;
 }
 
+get bbox_px() {return this.element.getBBox()}
 
-/** Update animated <g> elements **/
-
-update_transform() {
-/* Calculate and set the transform attribute */
+get bbox_cs() {
+/* Get bounding box prior to rotation or shift */
     let svg = this.svg;
-    let a = this.theta * svg.angleDir;
-    let [x, y] = svg.scale.times(this.shift);
-    let f = (x) => x.toFixed(svg.decimals);
-    let t = x || y ? `translate(${f(x)} ${f(y)})` : "";
-    if (a) {
-        let [px, py] = svg.a2p(...this.pivot);
-        t += ` rotate(${f(a)} ${f(px)} ${f(py)})`;
+    let b = this.element.getBBox();
+    let xy0 = new RArray(b.x, b.y);
+    let xy1 = xy0.plus([b.width, b.height]);
+    xy0 = svg.p2a(...xy0);
+    xy1 = svg.p2a(...xy1);
+    return {x: xy0[0], y: xy0[1], width: Math.abs(xy1[0] - xy0[0]), height: Math.abs(xy1[1] - xy0[1])};
+}
+
+draw_bbox(orig, draw) {
+/* Draw the transformed or original bounding rectangle and pivot point*/
+    let g = (orig ? this.svg : this).group();
+    if (!draw) {
+        css(g.circle("3", this.pivot));
+        draw = 1;
     }
-    t = t.trim();
-    if (t.length) this.$.attr("transform", t);
-    else this.$.removeAttr("transform");
-    return this;
+    // else draw = 3;
+    let b = this.bbox_cs;
+    if (draw & 1) css(g.rect([b.width, b.height], [b.x, b.y, "tl"]), {"fill-opacity": 0.2});
+    if (draw & 2) css(g.circle("3", this.pivot));
+    return g.css({"fill-opacity": 0.7});
+}
+
+static _anchor(posn) {
+    if (posn == null) posn = [0, 0];
+    if (posn.length == 4) return posn;
+    if (posn.length == 3) return [posn[0], posn[1], ...SVG2.parse_anchor(posn[2])];
+    if (posn[0] instanceof Array) {
+        let a = typeof(posn[1]) == "string" ? SVG2.parse_anchor(posn[1]) : posn[1];
+        return [...posn[0], ...a];
+    }
+    return [...posn, 0.5, 0.5];
+}
+
+rect_xy(size, posn) {
+/* Get bounding rectangle in pixel coordinates */
+    let [x, y, ax, ay] = SVG2._anchor(posn);
+    let svg = this.svg;
+    let [w, h] = this.px_size(size);
+    [x, y] = svg.a2p(...this.cs_size([x, y]));
+    return [w, h, x - ax * w, y - ay * h];
+}
+
+align(posn, dim) {
+/* Align the group based on its bounding box */
+    if (posn == null) {
+        posn = this._aligned_posn;
+        if (posn == null) return this;
+        [posn, dim] = posn;
+    }
+    let [x, y, ax, ay] = SVG2._anchor(posn);
+    let [sx, sy] = this.svg.scale;
+    let b = this.bbox_cs;
+    if (dim) dim = dim.trim().toLowerCase();
+    if (dim != "y") x -= ax * b.width * (sx < 0 ? -1 : 1);
+    if (dim != "x") y -= ay * b.height * (sy < 0 ? -1 : 1);
+    return this.config({_aligned_posn: [posn, dim], shift: [x - b.x, y - b.y]}); //.shift_by();
+}
+
+realign_text(t, n) {
+    clearTimeout(this.realign_text_timeout);
+    if (n == null) n = 10;
+    if (t !== false) for (let g of this.find_all("g")) {
+        if (g._aligned_posn && g.$.find("text").length) console.log(g.align());
+    }
+    if (t && n > 1) this.realign_text_timeout = setTimeout(() => this.realign_text(t, n-1), t);
+}
+
+
+/*** Kinematics getters and setters ***/
+
+get pivot() {return this._pivot};
+get shift() {return this._shift};
+get vel() {return this._vel}
+get acc() {return this._acc}
+get theta() {return this._theta}
+
+set pivot(xy) {this._pivot = new RArray(...this.cs_size(xy))}
+set shift(xy) {this._shift = new RArray(...this.cs_size(xy))}
+set vel(xy) {this._vel = new RArray(...this.cs_size(xy))}
+set acc(xy) {this._acc = new RArray(...this.cs_size(xy))}
+
+set theta(a) {
+    if (this.thetaMode) {
+        while (a >= 360) a -= 360;
+        while (a < 0) a += 360;
+    }
+    this._theta = a;
+}
+
+shift_by(xy) {
+    this._shift = this._shift.plus(this.cs_size(xy));
+    return this.update_transform();
 }
 
 update(dt) {
@@ -234,33 +307,37 @@ get animated() {return this.svg.items.indexOf(this) > -1}
 set animated(a) {SVG2.set_animated(this, a)}
 
 
-/** Create child elements within <svg> or <g> element **/
+/*** Clipping ***/
 
-create_child(tag, attr, html) {
-/* Create a child element of the <g> element */
-    let c = $(document.createElementNS(SVG2.nsURI, tag));
-    c.attr(attr ? attr : {});
-    if (html) c.html(html);
-    return c.appendTo(this.element);
+clip_path(id, clone) {
+/* Clone or move the <g> content to a <clip_path> */
+    let e = this.$;
+    let cp = $(document.createElementNS(SVG2.nsURI, "clipPath")).attr({id: id});
+    cp.appendTo(this.svg.defs[0]);
+    if (clone) cp.html(e.html());
+    else e.children().appendTo(cp);
+    let tr = e.attr("transform");
+    if (tr) cp.children().attr({"transform": tr});
+    return cp;
 }
 
-group(...css) {
-    let g = new SVG2g(this.svg, this.create_child("g"));
-    if (css) g.css(...css);
-    return g;
+clip(id) {
+/* Set the clip-path attribute */
+    this.$.attr({"clip-path": `url(#${id})`});
+    return this;
 }
 
-scaled(s) {return new SVG2scaled(this.svg, this.create_child("g"), s)}
 
-_px(x, i) {return Math.abs(typeof(x) == "string" ? parseFloat(x) : x * this.svg.scale[i])}
+/*** Basic shapes ***/
 
-_cs(xy) {
-    let [x, y] = xy == null ? [0, 0] : xy;
+line(p1, p2, selector) {
+/* Modify or append a <line> to the <g> element */
+    let e = selector ? $($(selector)[0]) : this.create_child("line");
     let svg = this.svg;
-    let [sx, sy] = svg.scale;
-    if (typeof(x) == "string") x = parseFloat(x) / Math.abs(sx);
-    if (typeof(y) == "string") y = parseFloat(y) / Math.abs(sy);
-    return new RArray(x, y);
+    let f = (x) => x.toFixed(svg.decimals);
+    let [x1, y1] = svg.a2p(...this.cs_size(p1));
+    let [x2, y2] = svg.a2p(...this.cs_size(p2));
+    return e.attr({x1: f(x1), y1: f(y1), x2: f(x2), y2: f(y2)});
 }
 
 circle(r, posn, selector) {
@@ -268,7 +345,7 @@ circle(r, posn, selector) {
     let e = selector ? $($(selector)[0]) : this.create_child("circle");
     let svg = this.svg;
     let f = (x) => x.toFixed(svg.decimals);
-    r = svg._px_size(r);
+    r = svg.px_radius(r);
     let d = `${f(2*r)}`;
     let [w, h, x, y] = this.rect_xy([d, d], posn);
     return e.attr({r: f(r), cx: f(x + w / 2), cy: f(y + h / 2)});
@@ -279,30 +356,9 @@ ellipse(r, posn, selector) {
     let e = selector ? $($(selector)[0]) : this.create_child("ellipse");
     let svg = this.svg;
     let f = (x) => x.toFixed(svg.decimals);
-    let rx = this._px(r[0], 0);
-    let ry = this._px(r[1], 1);
+    let [rx, ry] = svg.px_size(r);
     let [w, h, x, y] = this.rect_xy([f(2*rx), f(2*ry)], posn);
     return e.attr({rx: f(rx), ry: f(ry), cx: f(x + w / 2), cy: f(y + h / 2)});
-}
-
-static _anchor(posn) {
-    if (posn == null) posn = [0, 0];
-    if (posn.length == 4) return posn;
-    if (posn.length == 3) return [posn[0], posn[1], ...SVG2.parse_anchor(posn[2])];
-    if (posn[0] instanceof Array) {
-        let a = typeof(posn[1]) == "string" ? SVG2.parse_anchor(posn[1]) : posn[1];
-        return [...posn[0], ...a];
-    }
-    return [...posn, 0.5, 0.5];
-}
-
-rect_xy(size, posn) {
-    let [x, y, ax, ay] = SVG2._anchor(posn);
-    let svg = this.svg;
-    let w = this._px(size[0], 0);
-    let h = this._px(size[1], 1);
-    [x, y] = svg.a2p(...this._cs([x, y]));
-    return [w, h, x - ax * w, y - ay * h];
 }
 
 rect(size, posn, selector) {
@@ -312,6 +368,16 @@ rect(size, posn, selector) {
     let [w, h, x, y] = this.rect_xy(size, posn);
     return e.attr({width: f(w), height: f(h), x: f(x), y: f(y)});
 }
+
+poly(points, closed) {
+/* Modify or append a <polygon> or <polyline> to the <g> element */
+    let attr = {points: this.svg.pts_str(points)};
+    return $(closed)[0] instanceof SVGElement ? $(closed).attr(attr) :
+        this.create_child(closed ? "polygon" : "polyline", attr);
+}
+
+
+/*** Images ***/
 
 _img_size(size, wh) {
     if (!size) size = {scale: 1};
@@ -367,107 +433,16 @@ async mjax(tex, size, posn, color, theta) {
     });
 }
 
-ticks(opt) { /*
-    x, y: Specify coordinates of ticks and labels
-    size: Tick extent below and above
-    label: Function or decimal places for labels
-    css: Styling for labels
-    anchor, shift: Adjust location of labels
-    theta: orientation of labels
-*/
-    let p0, p1, gt, gl;
-    let svg = this.svg;
-    let [x, y, size, label] = [opt.x, opt.y, opt.size, opt.label];
-    let swap = y instanceof Array;
-    let g = this.group(swap ? ".TicksY" : ".TicksX");
-    if (swap) [x, y] = [y, x];
-    if (!y) y = 0;
-    let [x0, x1, dx] = x;
-    if (size) {
-        gt = g.group(".Ticks", "black@1");
-        p0 = svg._cs(swap ? [size[0], 0] : [0, size[0]]);
-        p1 = svg._cs(swap ? [size[1], 0] : [0, size[1]]);
-    }
-    if (label != null) {
-        gl = g.group(".Labels");
-        let [css, shift] = [opt.css, opt.shift];
-        if (css) {
-            if (!(css instanceof Array)) css = [css];
-            gl.css(...css);
-        }
-        if (shift) {
-            if (!(shift instanceof Array)) shift = swap ? [shift, 0] : [0, shift];
-            gl.shift_by(shift);
-        }
-    }
-    let f = isNaN(label) ? label : x => x.toFixed(label);
-    let anchor = opt.anchor ? opt.anchor : (swap ? "r" : "t");
-    for (let xi = x0; xi <= x1; xi += dx) {
-        let dp = swap ? [y, xi] : [xi, y];
-        if (size) gt.line(p0.plus(dp), p1.plus(dp));
-        if (label != null) {
-            let text = f(xi);
-            let t = gl.text(text, [...dp, anchor], opt.theta);
-            if (parseFloat(text) == 0) t.$.addClass("Zero");
-        }
-    }
-    return g;
-}
 
+/*** More shapes ***/
 
-plot(points, size, href, theta) {
-/* Plot an array of points as circles, rectangles, or images */
-    let g = this.group(".Plot", "black@1", "#0065fe");
-    let svg = this.svg;
-    let f = (x) => x.toFixed(svg.decimals);
-    if (theta) theta *= svg.angleDir;
-    if (!(points instanceof Array)) points = zip(points.x, points.y);
-    for (let pt of points) {
-        let e;
-        if (href) {
-            e = g.group().config({pivot: pt});
-            e.image(href, size, pt);
-            e = e.$;
-        }
-        else if (size instanceof Array) e = g.rect(size, pt);
-        else e = g.circle(size, pt);
-        if (theta) {
-            let [x, y] = svg.a2p(...pt);
-            e.attr({transform: `rotate(${f(theta)} ${f(x)},${f(y)})`});
-        }
-    }
-    return g;
-}
-
-poly(points, closed) {
-/* Modify or append a <polygon> or <polyline> to the <g> element */
-    let attr = {points: this.svg.pts_str(points)};
-    return $(closed)[0] instanceof SVGElement ? $(closed).attr(attr) :
-        this.create_child(closed ? "polygon" : "polyline", attr);
-}
-
-_cs_size(r) {return typeof(r) == "string" ? parseFloat(r) / this.svg.unit : r}
-_px_size(r) {return typeof(r) == "string" ? parseFloat(r) : r * this.svg.unit}
-
-star(n, far, near) {
-    let pts = star_points(n, this._cs_size(far), near == null ? null : this._cs_size(near));
-    return this.poly(pts, 1);
-}
-
-text(text, posn, theta, css) {return new SVG2text(this, text, posn, theta, css)}
-gtext(text, css, posn, theta) {return new SVG2text(this, text, posn, theta, css)}
 arrow(pts, options, anchor) {return new SVG2arrow(this, pts, options, anchor)}
 locus(eq, param, args) {return new SVG2locus(this, eq, param, args)}
 path(start) {return new SVG2path(this, start)}
 
-line(p1, p2, selector) {
-/* Modify or append a <line> to the <g> element */
-    let e = selector ? $($(selector)[0]) : this.create_child("line");
-    let svg = this.svg;
-    let f = (x) => x.toFixed(svg.decimals);
-    let [x1, y1] = svg.a2p(...this._cs(p1));
-    let [x2, y2] = svg.a2p(...this._cs(p2));
-    return e.attr({x1: f(x1), y1: f(y1), x2: f(x2), y2: f(y2)});
+star(n, far, near) {
+    let pts = star_points(n, this.cs_radius(far), near == null ? null : this.cs_radius(near));
+    return this.poly(pts, 1);
 }
 
 chevron(xy, dir, size) {
@@ -477,7 +452,7 @@ chevron(xy, dir, size) {
     else size = size.size;
     let svg = this.svg;
     let s = svg.scale;
-    size = this._px_size(size);
+    size = this.px_radius(size);
     let dx = -size / s[0], dy = ratio * size / s[1];
     let g = this.group();
     g.poly([[dx, dy], [0, 0], [dx, -dy]]);
@@ -495,6 +470,111 @@ ray(p1, p2, size, ...pos) {
     for (let pt of pos) g.chevron(seg.point(pt * L), svg.adjust_angle(seg.deg), size);
     return g;
 }
+
+ruler(n, tick, opt) { //width, big, offset, tickSmall, tickBig) {
+/* Draw a ruler */
+    if (typeof(tick) == "string") tick = parseFloat(tick) / Math.abs(this.svg.scale[1]);
+    opt = Object.assign({big: 10, offset: 0, tickSmall: 0.25, tickBig: 0.5}, opt);
+    let g = this.group(".Ruler");
+    let length = g.rulerLength = tick * (n + 2 * opt.offset);
+    let width = opt.width ? opt.width : g.rulerLength / 25;
+    g.rect([length, width]);
+    let x = tick * opt.offset - length / 2;
+    width /= 2;
+    for (let i=0;i<=n;i++) {
+        g.line([x, -width], [x, width * (2 * (i % opt.big ? opt.tickSmall : opt.tickBig) - 1)]);
+        x += tick;
+    }
+    return g;
+}
+
+cylinder(r, L) {
+/* Draw a cylinder; pivot is center of the elliptical "top" */
+    r = this.cs_size(r);
+    if (typeof(L) == "string") L = Math.abs(parseFloat(L) / this.svg.scale[1]);
+    let g = this.group(".Cylinder");
+    let p1 = new RArray(r[0], 0);
+    let p2 = p1.neg().minus([0, L]);
+    let c = g.svg.angleDir == -1 ? 2 : 0;
+    g.path(p1).ver(-L).arc_to(p2, r, c).ver(0).arc_to(p1, r).close().update();
+    g.ellipse(r);
+    return g;
+}
+
+plusminus(s, plus, thick) {
+/* Draw a plus or minus */
+    let svg = this.svg;
+    let g = this.group();
+    if (!thick) thick = 0.17;
+    s = svg.cs_radius(s);
+    let [x, y] = svg.cs_size([s, s]).times(0.5);
+    let [dx, dy] = [x * thick, y * thick];
+    let pts = plus ? [[dx, y], [dx, dy], [x, dy], [x, -dy], [dx, -dy], [dx, -y],
+        [-dx, -y], [-dx, -dy], [-x, -dy], [-x, dy], [-dx, dy], [-dx, y]] :
+        [[x, dy], [x, -dy], [-x, -dy], [-x, dy]];
+    g.poly(pts, 1);
+    return g;
+}
+
+stickman(h) {
+/* Add a stick man as an SVG2group instance */
+    let g = this.group(".Stickman", "none", "black@3");
+    if (typeof(h) == "string") h = Math.abs(parseFloat(h) / this.svg.scale[1]);
+    let r = h / 8;
+    g.circle(r, [0, 7 * r]);
+    g.line([0, 6 * r], [0, 3 * r]);
+    let w = 1.2 * r;
+    g.poly([[-w, 0], [0, 3 * r], [w, 0]]);
+    let pt = new RArray(0, 5 * r);
+    r *= 1.5;
+    g.poly([pt.plus(vec2d(r, uniform(150, 210))), pt, pt.plus(vec2d(r, uniform(-30, 30)))]);
+    return g;
+}
+
+coil(size, n, reverse, r, axle) {
+/* Draw a coil frame with turns of wire and axle */
+    let g0 = this.group();
+    g0.$.addClass("Coil");
+    let g = reverse ? g0.scaled([-1, 1]) : g0;
+    let [w, h] = size;
+    if (!n) n = 15;
+    if (!r) r = h / n / 4;
+    g.rect(size);
+    for (let i=0;i<n+0.5;i++) {
+        let y = (h - 6 * r) * (i - n / 2) / n;
+        let path = g._turn(size[0], r, i == n ? 2 : 3).config({shift: [0, y]});
+        path.$.addClass("Wire");
+        if (i == 0 || i == n) {
+            y += r * (i ? 2 : -2);
+            g.line([w / 2, y], [w / 2 + 2 * r, y]).addClass("Wire");
+        }
+    }
+    if (axle == null) axle = 0.7 * r;
+    if (axle) g.circle(axle);
+    return g0;
+}
+
+_turn(w, r, circ) {
+/* Render a turn of wire as a path */
+    let g = this.group();
+    if (circ == null) circ = 0;
+    w /= 2;
+    let p = g.path([w, circ & 1 ? 4 * r : 2 * r]);
+    if (circ & 1) p.arc([w, 3 * r], -90);
+    p.line_to([-w, -2 * r]);
+    if (circ & 2) p. arc([-w, -r], 90, 2);
+    p.update();
+    return g;
+}
+
+
+/*** Text ***/
+
+text(text, posn, theta, css) {return new SVG2text(this, text, posn, theta, css)}
+gtext(text, css, posn, theta) {return new SVG2text(this, text, posn, theta, css)}
+
+
+/*** Plotting ***/
 
 grid(x, y, appendAxes) {
 /* Draw a coordinate grid */
@@ -526,55 +606,102 @@ _grid(g, x, y, swap) {
     }
 }
 
-ruler(n, tick, opt) { //width, big, offset, tickSmall, tickBig) {
-/* Draw a ruler */
-    if (typeof(tick) == "string") tick = parseFloat(tick) / Math.abs(this.svg.scale[1]);
-    opt = Object.assign({big: 10, offset: 0, tickSmall: 0.25, tickBig: 0.5}, opt);
-    let g = this.group(".Ruler");
-    let length = g.rulerLength = tick * (n + 2 * opt.offset);
-    let width = opt.width ? opt.width : g.rulerLength / 25;
-    g.rect([length, width]);
-    let x = tick * opt.offset - length / 2;
-    width /= 2;
-    for (let i=0;i<=n;i++) {
-        g.line([x, -width], [x, width * (2 * (i % opt.big ? opt.tickSmall : opt.tickBig) - 1)]);
-        x += tick;
+ticks(opt, useDefault) { /*
+    x, y: Specify coordinates of ticks and labels
+    size: Tick extent below and above
+    label: Function or decimal places for labels
+    css: Styling for labels
+    anchor, shift: Adjust location of labels
+    theta: orientation of labels
+*/
+    if (useDefault) {
+        let def = {size: ["-6", 0], css: 15, label: 0, shift: "-8"};
+        opt = opt ? Object.assign(def, opt) : def;
+    }
+    let p0, p1, gt, gl;
+    let svg = this.svg;
+    let [x, y, size, label, skip] = [opt.x, opt.y, opt.size, opt.label, opt.skip];
+    let swap = y instanceof Array;
+    let g = this.group(swap ? ".TicksY" : ".TicksX");
+    if (swap) [x, y] = [y, x];
+    if (!y) y = 0;
+    let [x0, x1, dx] = x;
+    if (size) {
+        gt = g.group(".Ticks", "black@1");
+        p0 = svg.cs_size(swap ? [size[0], 0] : [0, size[0]]);
+        p1 = svg.cs_size(swap ? [size[1], 0] : [0, size[1]]);
+    }
+    if (label != null) {
+        let anchor = opt.anchor ? opt.anchor : (swap ? "r" : "t");
+        gl = g.group(".Labels", SVG2.parse_anchor(anchor, 1));
+        let [css, shift] = [opt.css, opt.shift];
+        if (css) {
+            if (!(css instanceof Array)) css = [css];
+            gl.css(...css);
+        }
+        if (shift) {
+            if (!(shift instanceof Array)) shift = swap ? [shift, 0] : [0, shift];
+            gl.shift_by(shift);
+        }
+    }
+    let f = isNaN(label) ? label : x => x.toFixed(label);
+    let i = 0;
+    if (!skip) skip = 1;
+    for (let xi = x0; xi <= x1; xi += dx) {
+        let dp = swap ? [y, xi] : [xi, y];
+        if (size) gt.line(p0.plus(dp), p1.plus(dp));
+        if (label != null && (i++) % skip == 0) {
+            let text = f(xi);
+            let t = gl.text(text, [...dp, false], opt.theta); // anchor
+            if (parseFloat(text) == 0) t.$.addClass("Zero");
+        }
     }
     return g;
 }
 
-cylinder(r, L) {
-/* Draw a cylinder; pivot is center of the elliptical "top" */
-    let g = this.group(".Cylinder");
-    let p1 = new RArray(r[0], 0);
-    let p2 = p1.neg().minus([0, L]);
-    let c = g.svg.angleDir == -1 ? 2 : 0;
-    g.path(p1).ver(-L).arc_to(p2, r, c).ver(0).arc_to(p1, r).close().update();
-    g.ellipse(r);
+plot(points, size, href, theta) {
+/* Plot a sequence of points as circles, rectangles, images or custom markers */
+    let g = this.group(".Plot", "black@1", "#0065fe");
+    if (!(points instanceof Array)) {
+        let [x, y] = [points.x, points.y];
+        if (!(x instanceof Array)) x = [...x];
+        if (y instanceof Function) y = [...fn_eval(y, x)];
+        else if (!(y instanceof Array)) y = [...y];
+        points = zip(x, y);
+    }
+    for (let pt of points) {
+        let gi = g.group().config({theta: theta, shift: pt});
+        if (size instanceof Function) size(gi, href);
+        else if (href) gi.image(href, size);
+        else if (size instanceof Array) gi.rect(size);
+        else gi.circle(size);
+    }
     return g;
 }
 
-pm(s, plus, xy) {
-/* Draw a plus or minus */
-    let g = this.group();
-    if (plus) g.rect([s/6, s], xy);
-    g.rect([s, s/6], xy);
+error_bar_y(x, y0, y1, dx, _swap) {
+    /* Draw x or y error bars */
+    dx = this.cs_radius(dx);
+    let g = this.group().addClass("ErrorBar");
+    if (_swap) {
+        g.line([y0, x], [y1, x]);
+        x -= dx / 2;
+        g.line([y0, x], [y0, x + dx]);
+        g.line([y1, x], [y1, x + dx]);    
+    }
+    else {
+        g.line([x, y0], [x, y1]);
+        x -= dx / 2;
+        g.line([x, y0], [x + dx, y0]);
+        g.line([x, y1], [x + dx, y1]);    
+    }
     return g;
 }
 
-stickman(h) {
-/* Add a stick man as an SVG2g instance */
-    let g = this.group(".Stickman", "none", "black@3");
-    let r = h / 8;
-    g.circle(r, [0, 7 * r]);
-    g.line([0, 6 * r], [0, 3 * r]);
-    let w = 1.2 * r;
-    g.poly([[-w, 0], [0, 3 * r], [w, 0]]);
-    let pt = new RArray(0, 5 * r);
-    r *= 1.5;
-    g.poly([pt.plus(vec2d(r, uniform(150, 210))), pt, pt.plus(vec2d(r, uniform(-30, 30)))]);
-    return g;
-}
+error_bar_x(x0, x1, y, dy) {return this.error_bar_y(y, x0, x1, dy, 1)}
+
+
+/*** Diagrams  ***/
 
 edot(n, r) {
 /* Electron dot diagram */
@@ -595,28 +722,6 @@ edot(n, r) {
     for (let i=0;i<n;i++) g.circle(0.125 * r, pts[i]);
     return g;
 }
-
-error_bar_y(x, y0, y1, dx, _swap) {
-    /* Draw x or y error bars */
-    dx = this._cs_size(dx);
-    let g = this.group().addClass("ErrorBar");
-    if (_swap) {
-        g.line([y0, x], [y1, x]);
-        x -= dx / 2;
-        g.line([y0, x], [y0, x + dx]);
-        g.line([y1, x], [y1, x + dx]);    
-    }
-    else {
-        g.line([x, y0], [x, y1]);
-        x -= dx / 2;
-        g.line([x, y0], [x + dx, y0]);
-        g.line([x, y1], [x + dx, y1]);    
-    }
-    return g;
-}
-
-error_bar_x(x0, x1, y, dy) {return this.error_bar_y(y, x0, x1, dy, 1)}
-
 
 tip_to_tail(vecs, options) {
 /* Draw a 2D "tip-to-tail" vector diagram */
@@ -671,46 +776,10 @@ energy_flow(data) {
     return this;
 }
 
-coil(size, n, reverse, r, axle) {
-/* Draw a coil frame with turns of wire and axle */
-    let g0 = this.group();
-    g0.$.addClass("Coil");
-    let g = reverse ? g0.scaled([-1, 1]) : g0;
-    let [w, h] = size;
-    if (!n) n = 15;
-    if (!r) r = h / n / 4;
-    g.rect(size);
-    for (let i=0;i<n+0.5;i++) {
-        let y = (h - 6 * r) * (i - n / 2) / n;
-        let path = g._turn(size[0], r, i == n ? 2 : 3).config({shift: [0, y]});
-        path.$.addClass("Wire");
-        if (i == 0 || i == n) {
-            y += r * (i ? 2 : -2);
-            g.line([w / 2, y], [w / 2 + 2 * r, y]).addClass("Wire");
-        }
-    }
-    if (axle == null) axle = 0.7 * r;
-    if (axle) g.circle(axle);
-    return g0;
-}
-
-_turn(w, r, circ) {
-/* Render a turn of wire as a path */
-    let g = this.group();
-    if (circ == null) circ = 0;
-    w /= 2;
-    let p = g.path([w, circ & 1 ? 4 * r : 2 * r]);
-    if (circ & 1) p.arc([w, 3 * r], -90);
-    p.line_to([-w, -2 * r]);
-    if (circ & 2) p. arc([-w, -r], 90, 2);
-    p.update();
-    return g;
-}
-
 }
 
 
-class SVG2scaled extends SVG2g {
+class SVG2scaled extends SVG2group {
 
 constructor(parent, g, scale) {
     super(parent, g);
@@ -741,38 +810,37 @@ coord_from_parent(xy) {
 
 }
 
-class SVG2text extends SVG2g {
+
+class SVG2text extends SVG2group {
 
 constructor(g, text, posn, theta, css) {
     super(g);
     let xy = posn == null ? [0, 0] : [posn[0], posn[1]];
-    this.config({shift: xy, theta: theta});
+    let anchor = SVG2.parse_anchor(posn && posn.length > 2 ? posn[2] : "", 1);
+    this.config({shift: xy, theta: theta}).css(anchor);
     if (css instanceof Array) this.css(...css);
     else if (css) this.css(css);
     let svg = this.svg;
-    let e = this._text$ = this.create_child("text");
-    let anchor = SVG2.parse_anchor(posn && posn.length > 2 ? posn[2] : "", 1);
-    e.html(text).css(anchor);
+    let e = this.text$ = this.create_child("text");
+    e.html(text); //.css(anchor);
     let [x, y] = svg.a2p(0, 0);
     let f = (x) => x.toFixed(svg.decimals);
     e.attr({x: f(x), y: f(y)});
     return;
 }
 
-get text() {return this._text$.html()}
-set text(t) {this._text$.html(t)}
+get text() {return this.text$.html()}
+set text(t) {this.text$.html(t)}
 
 }
 
-// SVG2text._make_map();
 
-
-class SVG2arrow extends SVG2g {
+class SVG2arrow extends SVG2group {
 
 constructor(g, info, options, anchor) {
     super(g);
     this.$.addClass("Arrow");
-    this._poly = this.poly([], 1);
+    this.poly$ = this.poly([], 1);
     this.reshape(info, options, anchor);
 }
 
@@ -793,8 +861,8 @@ reshape(info, options, anchor) {
 
     let svg = this.svg;
     let [tail, tip] = tail_and_tip(info);
-    tail = svg._cs(tail);
-    tip = svg._cs(tip);
+    tail = svg.cs_size(tail);
+    tip = svg.cs_size(tip);
     let seg = this.seg = new Segment(...tail, ...tip);
     if (!anchor) anchor = 0;
     else if (typeof(anchor) == "string") anchor = ["tail", "center", "tip"].indexOf(anchor) - 1;
@@ -810,42 +878,33 @@ reshape(info, options, anchor) {
     let pts = arrow_points(seg.length, opt);
     pts = transform({angle: seg.deg, deg: true, shift: seg.midpoint}, ...pts);
     for (let i=0;i<pts.length;i++) pts[i] = svg.p2a(...pts[i]);
-    this.poly(pts, this._poly);
+    this.poly(pts, this.poly$);
     return this;
 }
 
 label(text, shift) {
 /* Add text relative to arrow midpoint */
-    return this.gtext(text, ["sans", "none@"], this.seg.midpoint.plus(this._cs(shift)));
+    return this.gtext(text, ["sans", "none@"], this.seg.midpoint.plus(this.cs_size(shift)));
 }
 
 }
 
 
-class SVG2locus {
+class SVG2locus extends SVG2group {
 
 constructor(g, eq, param, args) {
+    super(g);
     let svg = this.svg = g.svg;
     this.eq = eq;
     if (!param) param = [svg.lrbt[0], svg.lrbt[1]];
     this.param = param.length > 2 ? param : param.concat([svg.$.width() / 3]);
     this.args = args;
-    this.$ = g.create_child("polyline", {}).addClass("Locus");
-    this.css("none");
-    this.element = this.$[0];
-    this.element.graphic = this;
+    this.poly$ = $(this.css(".Locus").create_child("polyline"));
     this.update();
 }
 
-css = SVG2g.prototype.css;
-
-config(attr) {
-/* Encapsulate multiple attributes */
-    for (let k in attr) this[k] = attr[k];
-    return this;
-}
-
 update() {
+    SVG2group.prototype.update.call(this);
     let svg = this.svg;
     let t = svg.time;
     let [eq, args] = [this.eq, this.args];
@@ -859,12 +918,9 @@ update() {
         pts.push(typeof(y) == "number" ? [x0, y] : y);
         x0 += dx;
     }
-    this.$.attr({points: svg.pts_str(pts)});
+    this.poly$.attr({points: svg.pts_str(pts)});
     return this;
 }
-
-get animated() {return this.svg.items.indexOf(this) > -1}
-set animated(a) {SVG2.set_animated(this, a)}
 
 }
 
@@ -922,8 +978,7 @@ arc_to(xy, r, choice, rotn) { // Draw a circular or elliptical arc to the specif
     let rx, ry;
     if (r instanceof Array) [rx, ry] = r;
     else rx = ry = r;
-    rx = svg._px(rx, 0);
-    ry = svg._px(ry, 1);
+    [rx, ry] = svg.px_size([rx, ry]);
     rotn = rotn ? f(rotn * svg.angleDir) : "0";
     let [x, y] = xy;        
     this.x = x;
@@ -988,15 +1043,17 @@ update() {return this.$.attr({d: this.d.trim()})}
 }
 
 
-class SVG2 extends SVG2g {
+class SVG2 extends SVG2group {
 
 constructor(selector, options) {
     super();
     this.svg = this;
     this.element = $(selector).filter("svg")[0];
     selector = this.$ = $(this.element).attr("xmlns", SVG2.nsURI);
-    this.element.graphic = this;
+    // this.element._gr = this;
+    this.element.svg2 = this;
     this.items = [];
+    this._key_map = {};
     this.decimals = 2;
 
     /* <svg> element size */
@@ -1044,9 +1101,14 @@ constructor(selector, options) {
     this.time = 0;
 }
 
+
+/*** Static helpers ***/
+
 static async sleep(t) {await new Promise(r => setTimeout(r, t))}
+static make_URL(url) {return new URL(url, SVG2.url).href}
 
 static parse_anchor(s, obj) {
+    if (s === false) return obj ? {} : null;
     let x = 0;
     [x, s] = SVG2._parse_anchor(s);
     if (s.length) x += SVG2._parse_anchor(s)[0];
@@ -1073,10 +1135,96 @@ static _parse_anchor(s) {
     return [0, s];
 }
 
+static* spring_points(p0, p1, n, dx, dy) {
+    let seg = new Segment(...p0, ...p1);
+    let L = seg.length;
+    if (!dx) dx = L / 10;
+    if (!dy) dy = L / 10;
+    let dL = (L - 2 * dx) / (2 * n);
+    let norm = seg.normal.times(dy);
+    yield seg.point(0);
+    let x = dx;
+    for (let i=0;i<=n;i++) {
+        yield seg.point(x).plus(norm.times(i ? (i % 2 ? 1 : -1) : 0));
+        x += (i ? 2 : 1) * dL;
+    }
+    yield seg.point(L - dx);
+    yield seg.point(L);
+}
+
+
+/*** Coordinates and metrics ***/
+
+static auto_lrbt(w, h, l, r, b, t) {
+/* Calculate coordinate limits so axes have the same scale */
+    if (t == null) {
+        let dy = (h - 1) * (r - l) / (w - 1);
+        if (b == null) {
+            t = dy / 2;
+            b = -t;
+        }
+        else t = b + dy;
+    }
+    return [l, r, b, t];
+}
+
 get size() {
     let e = this.$;
     return [parseFloat(e.attr("width")), parseFloat(e.attr("height"))];
 }
+
+get center() {
+    let [l, r, b, t] = this.lrbt;
+    return new RArray((l + r) / 2, (b + t) / 2);
+}
+
+coords_by_map(p1, a1, p2, a2) {
+/* Assign an abstract coordinate system to the drawing */
+    let [adx, ady] = new RArray(...a2).minus(a1);
+    let [pdx, pdy] = new RArray(...p2).minus(p1);
+    let sx = pdx / adx;
+    let sy = pdy / ady;
+    let s = this.scale = new RArray(sx, sy);
+    this.unit = Math.sqrt((sx*sx + sy*sy) / 2);
+    this.angleDir = sx * sy < 0 ? -1 : 1;
+    let t = new RArray(-1/sx, -1/sy);
+    p1 = new RArray(...p1).minus(s.times(a1));
+    this.a2p = (x, y) => p1.plus(s.times([x,y]));
+    this.p2a = (x, y) => p1.minus([x,y]).times(t);
+}
+
+event_coords(ev) {
+/* Calculate the coordinates of a mouse event in pixels and using the SVG2 coordinate system */
+    let e = this.$;
+    let dx = parseFloat(e.css("padding-left")) + parseFloat(e.css("border-left-width"));
+    let dy = parseFloat(e.css("padding-top")) + parseFloat(e.css("border-top-width"));
+    let r = this.element.getBoundingClientRect();
+    let px = new RArray(ev.clientX - (r.x + dx), ev.clientY - (r.y + dy));
+    px[0] *= parseFloat(e.attr("width")) / e.width();
+    px[1] *= parseFloat(e.attr("height")) / e.height();
+    return {pixels: px, coords: this.p2a(...px)};
+}
+
+adjust_angle(a, invert) {
+/* Adjust rotation angle when x and y scales differ */
+    let [sx, sy] = this.scale;
+    if (invert) {sx = 1 / sx; sy = 1 / sy}
+    return atan2(sy * this.angleDir * sin(a), sx * cos(a));
+}
+
+clip_rect(xy, id) {
+/* Create a clip path that excludes the margin */
+    if (xy == null) xy = 0;
+    xy = (xy instanceof Array ? this.cs_size(xy) : this.cs_size([xy, xy])).times(2);
+    let clip = this.group();
+    let [l, r, b, t] = this.lrbt;
+    clip.rect([Math.abs(r - l) + xy[0], Math.abs(t - b) + xy[1]], this.center);
+    clip.clip_path(id ? id : "lrbt");
+    return this;
+}
+
+
+/*** Converting and saving ***/
 
 get url() {return "data:image/svg+xml;base64," + unicode_to_base64(this.element.outerHTML)}
 
@@ -1151,26 +1299,13 @@ async save_image(fn, scale, bg) {
     return this.image_cv(scale, bg).then(cv => blobify(cv, "image/" + format)).then(b => b.save(fn));
 }
 
+
+/*** Other ***/
+
 get defs() {
     let d = this.$.find("defs");
     if (d.length == 0) d = this.create_child("defs").prependTo(this.$);
     return d;
-}
-
-get center() {
-    let [l, r, b, t] = this.lrbt;
-    return new RArray((l + r) / 2, (b + t) / 2);
-}
-
-clip_rect(xy, id) {
-/* Create a clip path that excludes the margin */
-    if (xy == null) xy = 0;
-    xy = this._cs(xy instanceof Array ? xy : [xy, xy]).times(2);
-    let clip = this.group();
-    let [l, r, b, t] = this.lrbt;
-    clip.rect([Math.abs(r - l) + xy[0], Math.abs(t - b) + xy[1]], this.center);
-    clip.clip_path(id ? id : "lrbt");
-    return this;
 }
 
 gradient(id, c1, c2, x1, x2, y1, y2) {
@@ -1195,57 +1330,10 @@ gradient(id, c1, c2, x1, x2, y1, y2) {
 
 static create(options) {return new SVG2(document.createElementNS(SVG2.nsURI, "svg"), options)}
 
-static auto_lrbt(w, h, l, r, b, t) {
-/* Calculate coordinate limits so axes have the same scale */
-    if (t == null) {
-        let dy = (h - 1) * (r - l) / (w - 1);
-        if (b == null) {
-            t = dy / 2;
-            b = -t;
-        }
-        else t = b + dy;
-    }
-    return [l, r, b, t];
-}
-
 update_transform() {return this}
 
-coords_by_map(p1, a1, p2, a2) {
-/* Assign an abstract coordinate system to the drawing */
-    let [adx, ady] = new RArray(...a2).minus(a1);
-    let [pdx, pdy] = new RArray(...p2).minus(p1);
-    let sx = pdx / adx;
-    let sy = pdy / ady;
-    let s = this.scale = new RArray(sx, sy);
-    this.unit = Math.sqrt((sx*sx + sy*sy) / 2);
-    this.angleDir = sx * sy < 0 ? -1 : 1;
-    let t = new RArray(-1/sx, -1/sy);
-    p1 = new RArray(...p1).minus(s.times(a1));
-    this.a2p = (x, y) => p1.plus(s.times([x,y]));
-    this.p2a = (x, y) => p1.minus([x,y]).times(t);
-}
-
-event_coords(ev) {
-/* Calculate the coordinates of a mouse event in pixels and using the SVG2 coordinate system */
-    let e = this.$;
-    let dx = parseFloat(e.css("padding-left")) + parseFloat(e.css("border-left-width"));
-    let dy = parseFloat(e.css("padding-top")) + parseFloat(e.css("border-top-width"));
-    let r = this.element.getBoundingClientRect();
-    let px = new RArray(ev.clientX - (r.x + dx), ev.clientY - (r.y + dy));
-    px[0] *= parseFloat(e.attr("width")) / e.width();
-    px[1] *= parseFloat(e.attr("height")) / e.height();
-    return {pixels: px, coords: this.p2a(...px)};
-}
-
-adjust_angle(a, invert) {
-/* Adjust rotation angle when x and y scales differ */
-    let [sx, sy] = this.scale;
-    if (invert) {sx = 1 / sx; sy = 1 / sy}
-    return atan2(sy * this.angleDir * sin(a), sx * cos(a));
-}
-
 group(...css) {
-    let g = new SVG2g(this);
+    let g = new SVG2group(this);
     if (css) g.css(...css);
     return g;
 }
@@ -1255,14 +1343,39 @@ pts_str(pts) {
     let s = "";
     let f = (x) => x.toFixed(this.decimals);
     for (let i=0;i<pts.length;i++) {
-        let [x, y] = this.a2p(...this._cs(pts[i]));
+        let [x, y] = this.a2p(...this.cs_size(pts[i]));
         s += (s.length ? " " : "") + `${f(x)},${f(y)}`;
     }
     return s;
 }
 
 
-/** Animation methods **/
+/*** Styling ***/
+
+static style(e, ...rules) {
+    let unit = (s) => isNaN(s) ? s : `${s}px`;
+    for (let r of rules) {
+        let s = ["string", "number"].indexOf(typeof(r));
+        if (s == -1) e.css(r);
+        else if (s == 0) {
+            if (r.charAt(0) == ".") e.addClass(r.substring(1));
+            else if (SVG2._style[r]) e.css(SVG2._style[r]);
+            else {
+                r = r.split("@");
+                if (r.length == 1) e.css({fill: r[0]});
+                else {
+                    if (r[0]) e.css({stroke: r[0]});
+                    if (r[1]) e.css({"stroke-width": unit(r[1])});
+                }
+            }
+        }
+        else if (s == 1) e.css({"font-size": unit(r)});
+    }
+    return e;
+}
+
+
+/*** Animation  ***/
 
 static set_animated(g, a) {
     let svg = g.svg;
@@ -1273,9 +1386,9 @@ static set_animated(g, a) {
 }
 
 animate(...args) {
-/* Append an array of animated SVG2g instances */
+/* Append an array of animated SVG2group instances */
     for (let arg of args) {
-        if (!arg.update) arg = $(arg)[0].graphic;
+        if (!arg.update) arg = $(arg)[0]._gr;
         if (this.items.indexOf(arg) == -1) this.items.push(arg);
     }
     return this;
@@ -1297,9 +1410,9 @@ update(dt) {
     if (this.beforeupdate) this.beforeupdate.call(this);
     for (let item of this.items) {
         try {
-            if (item.beforeupdate) item.beforeupdate(item);
+            if (item.beforeupdate) item.beforeupdate(); // item
             item.update(dt);
-            if (item.afterupdate) item.afterupdate(item);
+            if (item.afterupdate) item.afterupdate(); // item
         } catch(err) {console.warn(err)}
     }
     this.time += dt;
@@ -1339,9 +1452,19 @@ pause() {
 
 toggle() {return this.playing ? this.pause() : this.play()}
 
-click_toggle(n, click, init) {
-    let a = [() => click_cycle.toggle(this, false, ...range(n))];
-    for (let i=0;i<n;i++) a.push(() => click_cycle.toggle(this, true, i));
+click_toggle(n, click, init, solo, ...a) {
+    if (!a) a = [];
+    a.push(false);
+    for (let i=0;i<n;i++) a.push(() => {
+        let j = i - 1;
+        if (solo && i) click_cycle.toggle(this, false, j);
+        click_cycle.toggle(this, true, i);
+    });
+    for (let i=0;i<a.length;i++) {
+        let ai = a[i];
+        if (ai === true || ai === false)
+            a[i] = () => click_cycle.toggle(this, ai, ...range(n));
+    }
     click_cycle(this.element, init == null ? -1 : init, ...a);
     if (click) for (let i=0;i<click;i++)
         this.$.trigger("click");
@@ -1349,54 +1472,7 @@ click_toggle(n, click, init) {
 }
 
 
-/** Load and run SVG2 JavaScripts **/
-
-static async load(cb) {
-/* Send AJAX requests for SVG2 scripts */
-    let svgs = $("svg[data-svg2]");
-    let pending = {};
-    let ts = Date.now();
-    for (let svg of svgs) {
-        let [url, id, args] = $(svg).attr("data-svg2").split("#");
-        url = new URL(url, SVG2.url).href;
-        svg.info = [url, id, args];
-        if (pending[url] == null && SVG2._cache[url] == null)
-            pending[url] = fetch(`${url}?_=${ts}`).then((a) => a.text()).then(eval);
-    }
-    for (let p in pending) await pending[p];
-    for (let svg of svgs) {
-        let [url, id, args] = svg.info;
-        delete svg.info;
-        let data = `${url}#${id}`;
-        if (args) data += `#${args}`;
-        $(svg).removeAttr("data-svg2").attr("data-svg2x", data);
-        if (args) {
-            try {args = jeval(args)}
-            catch(err) {console.warn(err)}
-            if (!(args instanceof Array)) args = [args];
-        }
-        else args = [];
-        try {SVG2._cache[url][id](svg, ...args)}
-        catch(err) {console.warn(err)}
-    }
-    return cb ? cb() : null;
-}
-
-static cache_run(url, id, ...arg) {
-    let js = SVG2._cache[new URL(url, SVG2.url).href];
-    return js[id](...arg);
-}
-
-static cache(url, obj) {
-/* Load SVG2 JavaScript into cache */
-    SVG2._cache[new URL(url, SVG2.url).href] = obj;
-}
-
-static make_URL(url) {return new URL(url, SVG2.url).href}
-static cached(url) {return SVG2._cache[new URL(url, SVG2.url).href]}
-
-
-/** Vector diagram helpers **/
+/*** Diagram helpers ***/
 
 static vec_diag(sel, vecs, opt) {
 /* Draw a vector diagram in an <svg> tag */
@@ -1409,21 +1485,24 @@ static vec_diag(sel, vecs, opt) {
         let [l, r, b, t] = svg.lrbt;
         l = space * Math.ceil(l / space);
         b = space * Math.ceil(b / space);
-        let tick = opt.tick;
-        if (tick) {
-            svg.tick_label(n, 0, [...range(b, t + space / 10, space)], tick, x);
-            svg.tick_label(n, [...range(l, r + space / 10, space)], 0, tick, y);
-        }
-        else {
-            svg.label(n, x, [...range(b, t + space / 10, space)]);
-            svg.label(n, [...range(l, r + space / 10, space)], y);
-        }
+        let tick = {size: ["-6", 0], css: ["mono", 14], label: n, shift: "-8"};
+        if (opt.tick) tick = Object.assign(tick, opt.tick);
+        svg.ticks({x: [l, r + space / 10, space], ...tick}).shift_by([0, y ? y : 0]);
+        svg.ticks({y: [b, t + space / 10, space], ...tick}).shift_by([x ? x : 0, 0]);
+        // if (tick) {
+        //     svg.tick_label(n, 0, [...range(b, t + space / 10, space)], tick, x);
+        //     svg.tick_label(n, [...range(l, r + space / 10, space)], 0, tick, y);
+        // }
+        // else {
+        //     svg.label(n, x, [...range(b, t + space / 10, space)]);
+        //     svg.label(n, [...range(l, r + space / 10, space)], y);
+        // }
     }
     g.$.appendTo(svg.$);
-    for (let s of "XY") {
-        let e = svg.find(`g.Label${s}`);
-        if (e) e.shift_by([0, "-5"]);
-    }
+    // for (let s of "XY") {
+    //     let e = svg.find(`g.Label${s}`);
+    //     if (e) e.shift_by([0, "-5"]);
+    // }
     svg.$.find(".Zero").hide();
     if (opt.cycle == -1) g.$.find(".Component").hide();
     else if (opt.cycle) svg.vec_cycle(g.$, vecs.length > 1);
@@ -1537,55 +1616,18 @@ static ebg(sel, Emax, step, data, options) {
     return svg.update(0);
 }
 
-static* spring_points(p0, p1, n, dx, dy) {
-    let seg = new Segment(...p0, ...p1);
-    let L = seg.length;
-    if (!dx) dx = L / 10;
-    if (!dy) dy = L / 10;
-    let dL = (L - 2 * dx) / (2 * n);
-    let norm = seg.normal.times(dy);
-    yield seg.point(0);
-    let x = dx;
-    for (let i=0;i<=n;i++) {
-        yield seg.point(x).plus(norm.times(i ? (i % 2 ? 1 : -1) : 0));
-        x += (i ? 2 : 1) * dL;
-    }
-    yield seg.point(L - dx);
-    yield seg.point(L);
 }
 
-static style(e, ...rules) {
-    let unit = (s) => isNaN(s) ? s : `${s}px`;
-    for (let r of rules) {
-        let s = ["string", "number"].indexOf(typeof(r));
-        if (s == -1) e.css(r);
-        else if (s == 0) {
-            if (r.charAt(0) == ".") e.addClass(r.substring(1));
-            else if (SVG2._style[r]) e.css(SVG2._style[r]);
-            else {
-                r = r.split("@");
-                if (r.length == 1) e.css({fill: r[0]});
-                else {
-                    if (r[0]) e.css({stroke: r[0]});
-                    if (r[1]) e.css({"stroke-width": unit(r[1])});
-                }
-            }
-        }
-        else if (s == 1) e.css({"font-size": unit(r)});
-    }
-    return e;
-};
 
-}
-
+/*** Data ***/
 
 SVG2.nsURI = "http://www.w3.org/2000/svg";
-SVG2._cache = {};
-SVG2.load.pending = [];
 SVG2.url = location.href.split("#")[0];
+
+SVG2.serif = "'Noto Serif', 'Open Serif', 'Droid Serif', serif";
 SVG2.sans = "'Noto Sans', 'Open Sans', 'Droid Sans', Oxygen, sans-serif";
 SVG2.mono = "'Noto Sans Mono', Inconsolata, 'Droid Sans Mono', monospace";
-SVG2.symbol = SVG2.serif = "'Noto Serif', 'Open Serif', 'Droid Serif', serif";
+// SVG2.symbol = SVG2.serif;
 
 SVG2._style = {
     grid: {stroke: "lightgrey", "stroke-width": "0.5px"},
@@ -1595,9 +1637,6 @@ SVG2._style = {
     sans: {"font-family": SVG2.sans, "font-size": "18px"},
     serif: {"font-family": SVG2.serif, "font-size": "18px"},
     mono: {"font-family": SVG2.mono, "font-size": "18px"},
-
-    // Deprecated!
-    // text: {"font-family": SVG2.sans, "font-size": "18px", "text-anchor": "middle"},
 };
 
 SVG2.eq = {Ek: "E_k", Eg: "E_g"}

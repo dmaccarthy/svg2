@@ -254,9 +254,7 @@ function onFeedLoaded(feed, e, noHist) {
 
     // Add event listeners
     $("#Top").remove().appendTo("body").show();
-    $("#Buttons > a").on("click", (e) => {
-        loadFeed(e.currentTarget);
-    });
+    $("#Buttons > a").on("click", e => loadFeed(e.currentTarget));
 
     // Remove unnecessary MathJax elements
     setTimeout(() => $("div:is(.MJX_ToolTip, .MJX_LiveRegion, .MJX_HoverRegion)").remove(), 2000);
@@ -266,7 +264,8 @@ function onFeedLoaded(feed, e, noHist) {
     $("#Main, #Copy").show();
     drawChevrons();
     renderTeX();
-    SVG2.load(initFeed);
+    try {svg2_load(initFeed)}
+    catch(err) {initFeed()}
 }
 
 function printIcons() {
@@ -299,10 +298,18 @@ function initFeed() {
     }
 
     // Restore collapsed/expanded state
-    $("section.Post div.Collapse:not(.Expand)").hide();
-    let div = $("div.Collapse");
-    let toggle = collapse.toggled[loadFeed.current];
-    for (let i of toggle) $(div[i]).toggle();
+    let posts = $("section.Post");
+    let div = posts.find("div.Collapse");
+    let s = qs_args("section");
+    if (s) {
+        div.hide();
+        $(posts[parseInt(s)]).find("div.Collapse").show();
+    }
+    else {
+        div.filter(":not(.Expand)").hide();
+        let toggle = collapse.toggled[loadFeed.current];
+        for (let i of toggle) $(div[i]).toggle();
+    }
 
     // Finalize layout
     $("#Main").css("visibility", "visible");

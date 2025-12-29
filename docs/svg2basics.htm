@@ -8,7 +8,7 @@
 <p>Create an <code>&lt;svg&gt;</code> tag somewhere in the body of your document:</p>
 <pre class="Code" data-echo="html">&lt;p&gt;&lt;svg id="Drawing1"&gt;&lt;/svg&gt;&lt;/p&gt;</pre>
 
-<p>In your Javascript, create a new <code>SVG2</code> instance and associate it with the <code>&lt;svg&gt;</code> element using its <code>id</code> attribute:</p>
+<p>In your Javascript, create a new <code>SVG2</code> instance and associate it with the <code>&lt;svg&gt;</code> element using its <code>id</code> attribute. You will use this object to create, modify, and animate the <code>&lt;svg&gt;</code> element.</p>
 <pre class="Code" data-echo="js">function draw() {
     let svg = new SVG2("#Drawing1", {
         lrbt: [-5, 5, -5, 5],

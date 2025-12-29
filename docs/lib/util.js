@@ -25,6 +25,7 @@ click_cycle.toggle = (items, show, ...n) => {
     try {svg = items instanceof SVG2 ? items : null}
     catch(err) {}
     for (let i of n) {
+        // console.log(i, show);
         let e = svg ? svg.$.find(`.Toggle${i}`) : $(items[i]);
         if (show) e.fadeIn();
         else if (show == null) e.fadeToggle();

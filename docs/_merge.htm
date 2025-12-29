@@ -1,0 +1,30 @@
+
+<section class="Post NoPrintIcon" data-icon="svg">   
+<h2 class="Collapse">Merging...</h2><div id="Post" class="Collapse Expand">
+<!-- <p>...</p> -->
+</div></section>
+
+<script type="text/javascript" data-init="run">
+
+loadFeed.run = async() => {
+    let js = ["util", "math", "svg2"];
+    let fn = i => `lib/${js[i]}.js`
+    let p = [], txt = [];
+    for (let i=0;i<js.length;i++) {
+        p.push(fetch(fn(i)).then(e => e.text()).then(e => {
+            txt.push(e);
+        }));
+    }
+    let output = "";
+    for (let i=0;i<p.length;i++) {
+        await p[i];
+        $("<p>").html(fn(i)).appendTo("#Post");
+        output += `\n\n/** ${js[i]}.js **/\n\n` + txt[i];
+    }
+    blobify(output, "text/plain").then(b => b.save("svg2-x.js"));
+}
+
+
+loadFeed.data = {title: "Merge Tool", up: "home"}
+
+</script>
